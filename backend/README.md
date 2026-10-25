@@ -210,8 +210,8 @@ curl -s $API/events/$EVENT/clip -H "$AUTH" -o clip.mp4
 ## Tests
 
 ```bash
-docker compose run --rm -v ./tests:/app/tests api pytest -q        # everything
-docker compose run --rm -v ./tests:/app/tests api pytest -q -m "not slow"
+docker compose run --rm -v ./tests:/app/tests -v ./videos:/app/videos:ro api pytest -q   # everything
+docker compose run --rm -v ./tests:/app/tests api pytest -q -m "not slow"                  # no model run
 ```
 
 | File | Covers | Needs |
@@ -224,7 +224,7 @@ docker compose run --rm -v ./tests:/app/tests api pytest -q -m "not slow"
 | [test_fire_events.py](tests/test_fire_events.py) | camera CRUD with location fields, recording and its idempotency, lifecycle, triage, the alert poll, filters, samples, every analytics query | DB, MinIO for one |
 | [test_workspaces.py](tests/test_workspaces.py), [test_migrations.py](tests/test_migrations.py) | workspace isolation; the migration runner | DB |
 
-Database tests skip themselves unless a database with the schema applied is reachable, and each cleans up after itself.
+Database tests skip themselves unless a database with the schema applied is reachable, and each cleans up after itself. The `slow` test skips without `videos/` mounted, since the image does not contain the clip.
 
 ---
 

@@ -111,7 +111,7 @@ Cameras belong to a workspace, and their incidents, alerts and emails follow it.
 
 ```bash
 ./e2e/run.sh                                                         # Playwright, against the running stack
-docker compose run --rm -v ./backend/tests:/app/tests api pytest -q  # backend unit + DB tests
+docker compose run --rm -v ./backend/tests:/app/tests -v ./backend/videos:/app/videos:ro api pytest -q  # backend
 ```
 
 The e2e suite includes a real detection end to end: a camera on `fire1.mp4` raises the emergency dialog, which is then acknowledged, and its frame, clip and email are checked. See [e2e/README.md](e2e/README.md).
