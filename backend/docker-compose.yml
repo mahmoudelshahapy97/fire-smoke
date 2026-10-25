@@ -6,6 +6,7 @@ name: fire-smoke
 
 services:
   postgres:
+    container_name: fire-smoke-postgres
     # Plain Postgres would do (no extension is used); this image is the one the
     # sibling stacks on this host already have.
     image: pgvector/pgvector:pg17
@@ -27,6 +28,7 @@ services:
       retries: 20
 
   api:
+    container_name: fire-smoke-api
     build: .
     restart: unless-stopped
     env_file:
@@ -59,6 +61,7 @@ services:
   # Register the camera as rtsp://mediamtx:8554/fire1 -- that URL is
   # resolved by the api container, so "localhost" there would mean itself.
   mediamtx:
+    container_name: fire-smoke-mediamtx
     image: bluenviron/mediamtx:latest-ffmpeg
     profiles: ["testing"]
     restart: unless-stopped

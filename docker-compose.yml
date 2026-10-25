@@ -18,6 +18,7 @@ name: fire-smoke
 
 services:
   postgres:
+    container_name: fire-smoke-postgres
     # Plain Postgres would do (no extension is used); this image is the one the
     # sibling stacks on this host already have.
     image: pgvector/pgvector:pg17
@@ -46,6 +47,7 @@ services:
       retries: 20
 
   api:
+    container_name: fire-smoke-api
     build:
       context: ./backend
     restart: unless-stopped
@@ -98,6 +100,7 @@ services:
               capabilities: [gpu]
 
   web:
+    container_name: fire-smoke-web
     build:
       context: ./frontend
     restart: unless-stopped
@@ -122,6 +125,7 @@ services:
   # by the api container, so "localhost" there would mean the container
   # itself. From the host it is rtsp://localhost:8557/fire1.
   mediamtx:
+    container_name: fire-smoke-mediamtx
     image: bluenviron/mediamtx:latest-ffmpeg
     restart: unless-stopped
     environment:
@@ -148,6 +152,7 @@ services:
   # still maintained and patched. Chainguard only offers :latest for free, so it
   # is pinned by digest; to update, pull :latest and copy the new digest here.
   minio:
+    container_name: fire-smoke-minio
     image: cgr.dev/chainguard/minio@sha256:2136d593beacf4461187035eca949fe49abd589d5079735025c711ca58fee0c8
     restart: unless-stopped
     command: ["server", "/data", "--console-address", ":9001"]
@@ -169,6 +174,7 @@ services:
 
   # One-shot: creates the bucket, then exits. Re-running it is harmless.
   minio-init:
+    container_name: fire-smoke-minio-init
     image: cgr.dev/chainguard/minio@sha256:2136d593beacf4461187035eca949fe49abd589d5079735025c711ca58fee0c8
     depends_on:
       minio:
