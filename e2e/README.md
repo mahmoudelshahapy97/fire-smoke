@@ -36,7 +36,7 @@ Spec 04 runs the detector for real. Spec 02's camera reads `fire1.mp4` from `med
 
 - the emergency dialog, with InsightEye's wording and the camera's location;
 - acknowledging it from the dialog;
-- the stored frame and the evidence clip.
+- the stored frame and the evidence clip, which must actually play.
 
 On a GPU the alert arrives a few seconds after the worker restarts. On CPU it can take a minute, so the waits are long. The spec finishes by turning fire off again and resolving what it raised. That matters because an open alert pops up over every page of every console.
 
@@ -66,7 +66,7 @@ The bare `request` fixture used for direct API assertions is a *separate* contex
 | `01-shell.spec.js` | Health, alert poll, analytics shape, every route renders, nav, aliases, the alert bell, 404, theme toggle |
 | `02-camera-lifecycle.spec.js` | Register a camera with location fields and overrides, validation, start its worker |
 | `03-observability.spec.js` | Incident list and filters, detail and timeline, triage with the action taken, system page |
-| `04-fire-alert.spec.js` | A real detection: emergency dialog, acknowledge, frame and clip, alert email |
+| `04-fire-alert.spec.js` | A real detection: emergency dialog, acknowledge, frame and clip (played in Firefox), alert email |
 | `05-teardown.spec.js` | Edit, stop, delete, and check nothing else was taken with it |
 | `06-demo-walkthrough.spec.js` | A recorded tour for a human to watch (its own `demo` project) |
 | `07-workspaces.spec.js` | Create a workspace and a camera in it, switch to it, a non-member is shut out, delete it |
@@ -79,5 +79,6 @@ Anything that has to survive between files is re-read from the API (`findCamera`
 
 - **`collectPageProblems` runs on most specs.** A React page that throws still renders its shell, so a passing visual assertion can hide a broken component. Console errors are collected and asserted empty at the end. 404s and 503s from the media routes are filtered out, because a missing frame or an unreachable snapshot is a state the UI handles on purpose.
 - **Assertions check the API as well as the page.** A form that navigates correctly but wrote nothing is the failure worth catching, so the write specs read the row back. `02` in particular checks that a blank threshold is *absent* from `settings`, not stored as `0`.
+- **Clip playback is checked in Firefox.** Playwright's Chromium is the open-source build and has no H.264 decoder, so a `<video>` of an evidence clip reports "no supported sources" there. Chrome, Edge, Safari and Firefox play them. Spec 04 launches Firefox, with the saved admin session, just for that one check; the image `run.sh` uses already has it.
 - **Nothing is left OPEN.** Specs that change a seeded incident put it back, and never to OPEN.
 - **`05` verifies the seed survived.** Deleting a camera cascades to its incidents, so a stray delete would silently gut the fixture and leave the next run failing somewhere unrelated.

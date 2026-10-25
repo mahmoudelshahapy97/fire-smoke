@@ -18,7 +18,8 @@ import { fileURLToPath } from "url";
 export const API = "/api/v1";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ADMIN_STATE = path.join(__dirname, "..", ".auth", "admin.json");
+/** The signed-in admin session global.setup.js saves; any browser context can start from it. */
+export const ADMIN_STATE = path.join(__dirname, "..", ".auth", "admin.json");
 
 /**
  * There is no public signup (see database/schema.sql:app_user and

@@ -13,7 +13,9 @@
 #   ./e2e/run.sh tests/04-fire-alert.spec.js      # one file
 #
 # Results land in e2e/playwright-report (HTML), e2e/results.json and
-# e2e/test-results (screenshots, traces, video of any failure).
+# e2e/test-results (screenshots, traces, video of any failure). The container
+# runs as root, so they are handed back to the calling user afterwards;
+# the exit code is still Playwright's.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -44,7 +46,11 @@ docker run --rm \
   -e MAILPIT_URL="${MAILPIT_URL:-}" \
   -v "${HERE}:/e2e" \
   -v fire-smoke-e2e-node-modules:/e2e/node_modules \
+  -e HOST_UID="$(id -u)" \
+  -e HOST_GID="$(id -g)" \
   -w /e2e \
   --user root \
   "${IMAGE}" \
-  bash -lc "npm install --no-audit --no-fund --silent && npx playwright test $*"
+  bash -lc "npm install --no-audit --no-fund --silent && npx playwright test $*; status=\$?; \
+    chown -R \"\$HOST_UID:\$HOST_GID\" .auth test-results playwright-report results.json artifacts 2>/dev/null; \
+    exit \$status"

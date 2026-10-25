@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
+  ADMIN_STATE,
   CAMERA_NAME,
   CAMERA_PLACE,
   OPERATOR_CREDENTIALS,
@@ -162,10 +163,57 @@ test("the incident keeps its annotated frame and an evidence clip", async ({ pag
   expect(clip.status()).toBe(206);
   expect(clip.headers()["content-type"]).toBe("video/mp4");
 
-  // And the detail page plays it rather than saying it is still recording.
+  // And the detail page offers a player rather than saying it is still recording.
   await page.goto(`/events/${incident.event_id}`);
   await expect(page.locator("video")).toBeVisible();
   await expect(page.getByText("Still in view")).toBeVisible();
+});
+
+test("the evidence clip plays in a browser", async ({ playwright, request }) => {
+  const camera = await findCamera(request);
+  test.skip(!camera, "no camera");
+  const { events = [] } = await (
+    await request.get(`/api/v1/events?camera_id=${camera.camera_id}&kind=fire&per_page=1`, {
+      headers: authHeaders(),
+    })
+  ).json();
+  test.skip(!events[0]?.has_clip, "the previous test did not get a clip");
+
+  // Firefox, not this project's Chromium: Playwright's Chromium is the
+  // open-source build, which has no H.264 decoder ("no supported sources"),
+  // while Chrome, Edge, Safari and Firefox all play these clips. The clip is
+  // authenticated by the cookie in the saved admin session, as for any <video>.
+  const browser = await playwright.firefox.launch();
+  try {
+    const context = await browser.newContext({
+      baseURL: test.info().project.use.baseURL,
+      storageState: ADMIN_STATE,
+    });
+    const page = await context.newPage();
+    await page.goto(`/events/${events[0].event_id}`);
+    const video = page.locator("video");
+    await expect(video).toBeVisible();
+
+    const played = await video.evaluate(async (element) => {
+      element.muted = true;
+      await element.play();
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+      return {
+        error: element.error?.code ?? null,
+        duration: element.duration,
+        currentTime: element.currentTime,
+        width: element.videoWidth,
+      };
+    });
+    expect(played.error, JSON.stringify(played)).toBeNull();
+    expect(played.width).toBeGreaterThan(0);
+    // Pre-roll plus post-roll: comfortably more than the post-roll alone.
+    expect(played.duration).toBeGreaterThan(15);
+    // It actually advanced, so frames decoded rather than a stuck first frame.
+    expect(played.currentTime).toBeGreaterThan(1);
+  } finally {
+    await browser.close();
+  }
 });
 
 test("the alert email carries the same wording", async ({ request }) => {
