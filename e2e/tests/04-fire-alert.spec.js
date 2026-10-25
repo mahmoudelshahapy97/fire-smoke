@@ -169,7 +169,7 @@ test("the incident keeps its annotated frame and an evidence clip", async ({ pag
   await expect(page.getByText("Still in view")).toBeVisible();
 });
 
-test("the evidence clip plays in a browser", async ({ playwright, request }) => {
+test("the evidence clip plays in a browser", async ({ playwright, request }, testInfo) => {
   const camera = await findCamera(request);
   test.skip(!camera, "no camera");
   const { events = [] } = await (
@@ -183,11 +183,16 @@ test("the evidence clip plays in a browser", async ({ playwright, request }) => 
   // open-source build, which has no H.264 decoder ("no supported sources"),
   // while Chrome, Edge, Safari and Firefox all play these clips. The clip is
   // authenticated by the cookie in the saved admin session, as for any <video>.
+  // Recorded by hand, since the config's video setting only covers the
+  // fixture's own page; attached below so it lands in artifacts/ too.
   const browser = await playwright.firefox.launch();
+  let context;
   try {
-    const context = await browser.newContext({
-      baseURL: test.info().project.use.baseURL,
+    context = await browser.newContext({
+      baseURL: testInfo.project.use.baseURL,
       storageState: ADMIN_STATE,
+      viewport: { width: 1600, height: 1000 },
+      recordVideo: { dir: testInfo.outputPath("firefox"), size: { width: 1600, height: 1000 } },
     });
     const page = await context.newPage();
     await page.goto(`/events/${events[0].event_id}`);
@@ -205,6 +210,10 @@ test("the evidence clip plays in a browser", async ({ playwright, request }) => 
         width: element.videoWidth,
       };
     });
+    await testInfo.attach("firefox playing", {
+      body: await page.screenshot(),
+      contentType: "image/png",
+    });
     expect(played.error, JSON.stringify(played)).toBeNull();
     expect(played.width).toBeGreaterThan(0);
     // Pre-roll plus post-roll: comfortably more than the post-roll alone.
@@ -212,6 +221,12 @@ test("the evidence clip plays in a browser", async ({ playwright, request }) => 
     // It actually advanced, so frames decoded rather than a stuck first frame.
     expect(played.currentTime).toBeGreaterThan(1);
   } finally {
+    // The video file is complete only once its context has closed.
+    const recording = context?.pages()[0]?.video();
+    await context?.close();
+    if (recording) {
+      await testInfo.attach("firefox", { path: await recording.path(), contentType: "video/webm" });
+    }
     await browser.close();
   }
 });

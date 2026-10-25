@@ -20,7 +20,11 @@ Results land in:
 | --- | --- |
 | `playwright-report/` | HTML report (`npx playwright show-report`) |
 | `results.json` | machine-readable summary |
-| `test-results/` | screenshots, video and traces for failures |
+| `artifacts/videos/<spec>/` | a video of every test, named by its order and title |
+| `artifacts/screenshots/<spec>/` | every test's final screen; the demo tour's steps (`step-NN-…`); spec 04's clip playing in Firefox |
+| `test-results/` | Playwright's raw output, traces for failures; wiped at the start of each run |
+
+`artifacts-reporter.js` copies the videos and screenshots out of `test-results/` after each test. A run replaces the files of the tests it ran and keeps the rest, so running one spec does not throw the others away. `artifacts/` is git-ignored.
 
 To run against a different origin, such as a staging deploy or the Vite dev server:
 

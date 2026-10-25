@@ -6,29 +6,30 @@
 // storageState) so the recording shows the real login screen rather than
 // starting from an already-authenticated session.
 //
-// Every screenshot and the one video land in e2e/artifacts/, which is inside
-// the bind mount run.sh gives the Playwright container -- anything written
-// outside e2e/ inside that container does not survive it exiting.
+// Its step-by-step screenshots land in e2e/artifacts/screenshots/06-demo-walkthrough/,
+// which is inside the bind mount run.sh gives the Playwright container --
+// anything written outside e2e/ inside that container does not survive it
+// exiting. The video is filed next to every other test's by
+// artifacts-reporter.js, in artifacts/videos/06-demo-walkthrough/.
 import { expect, test } from "@playwright/test";
 import fs from "fs";
 import path from "path";
+import { VIDEO } from "../playwright.config.js";
 import { ADMIN_CREDENTIALS, VIEWER_CREDENTIALS } from "./helpers.js";
 
-const ARTIFACTS_DIR = path.resolve("artifacts");
-const SCREENSHOTS_DIR = path.join(ARTIFACTS_DIR, "screenshots");
-const VIDEO_PATH = path.join(ARTIFACTS_DIR, "videos", "walkthrough.webm");
+const SCREENSHOTS_DIR = path.resolve("artifacts", "screenshots", "06-demo-walkthrough");
 
 fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
-fs.mkdirSync(path.dirname(VIDEO_PATH), { recursive: true });
 
 // Always record, regardless of pass/fail -- the point of this file is the
-// artifact, not an assertion result.
-test.use({ video: "on" });
+// artifact, not an assertion result. (The config records every test now; this
+// keeps the tour recorded even if that changes.)
+test.use({ video: VIDEO });
 
 let shotIndex = 0;
 async function shot(page, name) {
   shotIndex += 1;
-  const file = `${String(shotIndex).padStart(2, "0")}-${name}.png`;
+  const file = `step-${String(shotIndex).padStart(2, "0")}-${name}.png`;
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, file), fullPage: true });
 }
 
@@ -143,7 +144,4 @@ test("guided tour: login, every screen, and the viewer's restricted view", async
   await page.getByRole("link", { name: "Cameras" }).click();
   await expect(page.getByRole("link", { name: "Add camera" })).toHaveCount(0);
   await shot(page, "viewer-cameras-no-management-actions");
-
-  await page.close();
-  await page.video()?.saveAs(VIDEO_PATH);
 });

@@ -11,6 +11,10 @@ import { defineConfig, devices } from "@playwright/test";
  */
 const baseURL = process.env.BASE_URL || "http://localhost:8083";
 
+/** Every project runs at Desktop Chrome's 1280x720. Without a size Playwright
+ *  scales recordings down to fit 800 px, too small to read the console. */
+export const VIDEO = { mode: "on", size: { width: 1280, height: 720 } };
+
 export default defineConfig({
   testDir: "./tests",
   // Serial on purpose. The suite creates a camera, makes it raise a real fire
@@ -28,12 +32,16 @@ export default defineConfig({
     ["list"],
     ["html", { outputFolder: "playwright-report", open: "never" }],
     ["json", { outputFile: "results.json" }],
+    // Every test's video and screenshots, by spec and test, in artifacts/.
+    ["./artifacts-reporter.js"],
   ],
   use: {
     baseURL,
     trace: "retain-on-failure",
+    // Kept for every test, not just failures: artifacts-reporter.js files them
+    // under artifacts/ so a run can be watched back.
     screenshot: "on",
-    video: "retain-on-failure",
+    video: VIDEO,
     actionTimeout: 30_000,
     navigationTimeout: 60_000,
     viewport: { width: 1600, height: 1000 },
@@ -65,7 +73,7 @@ export default defineConfig({
     // login screen; screenshots and the video land in e2e/artifacts/.
     {
       name: "demo",
-      use: { ...devices["Desktop Chrome"], video: "on" },
+      use: { ...devices["Desktop Chrome"], video: VIDEO },
       testMatch: /06-demo-walkthrough\.spec\.js/,
     },
   ],
