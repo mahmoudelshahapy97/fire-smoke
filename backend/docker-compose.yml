@@ -1,0 +1,77 @@
+# Explicit project name: without it compose derives one from the directory
+# ("backend"), which collides with any other stack started from a folder of the
+# same name. It also matches ../docker-compose.yml, so the two share one pgdata
+# volume and one API image rather than running against two separate databases.
+name: fire-smoke
+
+services:
+  postgres:
+    # Plain Postgres would do (no extension is used); this image is the one the
+    # sibling stacks on this host already have.
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-firesmoke_db}
+      POSTGRES_USER: ${POSTGRES_USER:-firesmoke}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-firesmoke_pass}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../database/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+      - ../database:/sql:ro
+    ports:
+      - "${POSTGRES_HOST_PORT:-5437}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-firesmoke} -d ${POSTGRES_DB:-firesmoke_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      # fire.pt lives here, outside the image
+      - ./models:/app/models
+      - ./logs:/app/logs
+      # Versioned schema changes, applied at startup (app/core/migrations.py).
+      - ../database/migrations:/app/migrations:ro
+    ports:
+      - "${API_HOST_PORT:-8004}:8000"
+    # The detector runs on the GPU (MODEL_DEVICE=cuda in .env).
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # Republishes a local mp4 as RTSP so the camera path is testable without
+  # physical hardware:  docker compose --profile testing up -d mediamtx
+  # Register the camera as rtsp://mediamtx:8554/fire1 -- that URL is
+  # resolved by the api container, so "localhost" there would mean itself.
+  mediamtx:
+    image: bluenviron/mediamtx:latest-ffmpeg
+    profiles: ["testing"]
+    restart: unless-stopped
+    environment:
+      MTX_PROTOCOLS: tcp
+      MTX_PATHS_FIRE1_RUNONDEMAND: >-
+        ffmpeg -re -stream_loop -1 -i /videos/fire1.mp4 -c copy -f rtsp
+        rtsp://localhost:8554/fire1
+      MTX_PATHS_FIRE1_RUNONDEMANDRESTART: "yes"
+    volumes:
+      - ./videos:/videos:ro
+    ports:
+      - "${RTSP_HOST_PORT:-8557}:8554"
+
+volumes:
+  pgdata:

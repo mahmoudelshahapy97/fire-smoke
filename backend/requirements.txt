@@ -1,0 +1,37 @@
+# API
+fastapi
+uvicorn[standard]
+starlette
+pydantic
+pydantic-settings
+pydantic[email]
+python-dotenv
+python-multipart
+
+# Auth
+PyJWT
+passlib[argon2]
+argon2-cffi
+
+# Database
+asyncpg
+
+# Computer vision
+opencv-python-headless
+numpy
+Pillow
+ultralytics
+torch
+torchvision
+
+# Object storage (images and videos)
+minio
+
+# Misc
+aiofiles
+httpx
+tenacity
+
+# Tests
+pytest
+pytest-asyncio

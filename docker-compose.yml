@@ -1,0 +1,190 @@
+name: fire-smoke
+
+# Full stack: database + API + operator console + test RTSP + object storage.
+#
+#   docker compose up --build                          everything, test RTSP included
+#   docker compose up -d postgres                      just the database
+#
+# backend/docker-compose.yml is the backend-only stack, for when you are
+# iterating on detection and do not want a web container in the way. This file
+# wires all the tiers together. Run it from THIS directory, not from backend/.
+# The folder name has an "&" in it, so quote it in shell commands:
+#   cd "/home/ubuntu/fire&smoke"
+#
+# Host ports avoid the other feature stacks on this machine (no-entry-zone
+# 5432/8000/8080, blocked-exit 5433/8001/8081, lost-found 5436/8003/8082 and
+# MinIO 9000/9001): Postgres on 5437, the API on 8004, the console on 8083, the
+# test RTSP server on 8557 and MinIO on 9002/9003.
+
+services:
+  postgres:
+    # Plain Postgres would do (no extension is used); this image is the one the
+    # sibling stacks on this host already have.
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-firesmoke_db}
+      POSTGRES_USER: ${POSTGRES_USER:-firesmoke}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-firesmoke_pass}
+    ports:
+      # Host port only. Inside the network the API always uses 5432.
+      - "${POSTGRES_HOST_PORT:-5437}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # There is no Alembic in this feature, so schema.sql *is* the schema and
+      # it does belong in initdb.d -- Postgres runs it once, on the first boot
+      # of an empty volume. Mounted as a single file so seed.sql and queries.sql
+      # sit alongside it without being executed at boot.
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+      # The rest, readable inside the container for running by hand.
+      - ./database:/sql:ro
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-firesmoke} -d ${POSTGRES_DB:-firesmoke_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      # Images and videos are written to MinIO (with a Postgres/disk fallback).
+      minio-init:
+        condition: service_completed_successfully
+    env_file:
+      - ./backend/.env
+    environment:
+      # Overrides .env: inside the network Postgres is reachable by service name
+      # on its container port, whatever the host publishes it as.
+      DB_HOST: postgres
+      DB_PORT: 5432
+      # The console's origin, for the direct (non-proxied) calls a browser makes
+      # if someone opens the API host itself.
+      CORS_ORIGINS: '["http://localhost:8083","http://localhost:5173"]'
+      # Object storage for images and videos (minio service below).
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
+      MINIO_BUCKET: ${MINIO_BUCKET:-firesmoke}
+      MINIO_SECURE: "false"
+    ports:
+      - "${API_HOST_PORT:-8004}:8000"
+    volumes:
+      # fire.pt lives here, outside the image (backend/models/README.md).
+      - ./backend/models:/app/models
+      - ./backend/logs:/app/logs
+      # Evidence clips kept on disk while MinIO is down
+      # (data/clips/<camera_id>/<event_id>.mp4) survive rebuilds.
+      - ./backend/data:/app/data
+      # Versioned schema changes, applied at startup (app/core/migrations.py).
+      - ./database/migrations:/app/migrations:ro
+    # Workers need time to release their captures before the container dies.
+    stop_grace_period: 30s
+    deploy:
+      # NOT scalable: stream workers are in-process asyncio tasks holding
+      # per-camera incident state. Two replicas would open every camera twice
+      # and double every alert.
+      replicas: 1
+      # The fire & smoke detector runs on the GPU (MODEL_DEVICE=cuda in backend/.env).
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  web:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      # nginx proxies /api, /health and the backend's /docs to FastAPI. Service
+      # name and internal port -- the browser never resolves this.
+      FS_API_URL: http://api:8000
+    ports:
+      - "${WEB_HOST_PORT:-8083}:80"
+
+  # Local RTSP server for testing without a real camera. Each path below plays
+  # one clip from backend/videos on demand: starting a camera that reads it
+  # launches ffmpeg from the top of the clip, looping until the camera stops
+  # (mediamtx closes it ~10 s after the last reader leaves).
+  #
+  # It starts with the rest of the stack: the seeded cameras read from it, and
+  # without it every worker sits in reconnect backoff.
+  #
+  # Register the camera as rtsp://mediamtx:8554/fire1 -- that URL is resolved
+  # by the api container, so "localhost" there would mean the container
+  # itself. From the host it is rtsp://localhost:8557/fire1.
+  mediamtx:
+    image: bluenviron/mediamtx:latest-ffmpeg
+    restart: unless-stopped
+    environment:
+      MTX_PROTOCOLS: tcp
+      # -stream_loop -1 so the clip never ends: a worker reconnecting to a
+      # finished stream looks like a broken camera rather than a test rig.
+      # RUNONDEMANDRESTART restarts ffmpeg if it dies while a camera is reading.
+      MTX_PATHS_FIRE1_RUNONDEMAND: >-
+        ffmpeg -re -stream_loop -1 -i /videos/fire1.mp4 -c copy -f rtsp
+        rtsp://localhost:8554/fire1
+      MTX_PATHS_FIRE1_RUNONDEMANDRESTART: "yes"
+    volumes:
+      - ./backend/videos:/videos:ro
+    ports:
+      - "${RTSP_HOST_PORT:-8557}:8554"
+
+  # S3-compatible object storage for images and videos (incident frames and
+  # evidence clips). Inside the network: http://minio:9000.
+  # Web console: http://localhost:${MINIO_CONSOLE_HOST_PORT:-9003}, log in with
+  # MINIO_ROOT_USER / MINIO_ROOT_PASSWORD from the root .env.
+  #
+  # MinIO no longer publishes community images (Docker Hub and quay.io are gone
+  # or login-only), so this is Chainguard's build of MinIO from source, which is
+  # still maintained and patched. Chainguard only offers :latest for free, so it
+  # is pinned by digest; to update, pull :latest and copy the new digest here.
+  minio:
+    image: cgr.dev/chainguard/minio@sha256:2136d593beacf4461187035eca949fe49abd589d5079735025c711ca58fee0c8
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
+    ports:
+      - "${MINIO_API_HOST_PORT:-9002}:9000"
+      - "${MINIO_CONSOLE_HOST_PORT:-9003}:9001"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      # The image ships mc but no curl/wget; "local" is mc's built-in alias
+      # for http://localhost:9000.
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # One-shot: creates the bucket, then exits. Re-running it is harmless.
+  minio-init:
+    image: cgr.dev/chainguard/minio@sha256:2136d593beacf4461187035eca949fe49abd589d5079735025c711ca58fee0c8
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        mc alias set fs http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" &&
+        mc mb --ignore-existing "fs/$$MINIO_BUCKET"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
+      MINIO_BUCKET: ${MINIO_BUCKET:-firesmoke}
+    # mc writes its alias config under $HOME.
+    restart: "no"
+
+volumes:
+  pgdata:
+  miniodata:
