@@ -18,7 +18,8 @@ test.describe.configure({ mode: "serial" });
 test("an unauthenticated visit to a protected route redirects to login", async ({ page }) => {
   await page.goto("/cameras");
   await expect(page).toHaveURL(/\/login$/);
-  await expect(page.getByRole("heading", { name: /Fire & Smoke/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "InsightEye" })).toBeVisible();
+  await expect(page.getByText("Fire & smoke detection")).toBeVisible();
 });
 
 test("a wrong password is rejected with a visible error", async ({ page }) => {
