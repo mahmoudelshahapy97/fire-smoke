@@ -42,14 +42,16 @@ import PageHeader from "../components/PageHeader";
 import StatCard from "../components/StatCard";
 import { KIND_COLOR, LOCATION_GROUPS } from "../utils/constants";
 import { formatDateTime, formatDuration, formatNumber, formatScore } from "../utils/format";
+import { useTranslation } from "react-i18next";
+import i18n from "i18next";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ChartTooltip, Legend);
 
 const WINDOWS = [
-  { value: 1, label: "Last 24 hours" },
-  { value: 7, label: "Last 7 days" },
-  { value: 30, label: "Last 30 days" },
-  { value: 90, label: "Last 90 days" },
+  { value: 1, get label() { return i18n.t("analytics.last24Hours"); } },
+  { value: 7, get label() { return i18n.t("analytics.last7Days"); } },
+  { value: 30, get label() { return i18n.t("analytics.last30Days"); } },
+  { value: 90, get label() { return i18n.t("analytics.last90Days"); } },
 ];
 
 // The busiest cameras are the story; the long tail stays in the table below.
@@ -118,6 +120,7 @@ function Funnel({ stages }) {
  * incidents in the window, with operator verdicts standing in for ground truth.
  */
 function ConfidenceAudit({ audit, baseOptions, theme, dismissed }) {
+  const { t } = useTranslation();
   const summary = audit.summary;
 
   const histogram = useMemo(() => {
@@ -128,13 +131,13 @@ function ConfidenceAudit({ audit, baseOptions, theme, dismissed }) {
         labels: buckets.map((bucket) => `${Math.round(bucket.min * 100)}–${Math.round(bucket.max * 100)}%`),
         datasets: [
           {
-            label: "Incidents",
+            label: t("analytics.incidents"),
             data: buckets.map((bucket) => bucket.count - bucket.false_positives),
             backgroundColor: KIND_COLOR.fire,
             ...segment,
           },
           {
-            label: "False positives",
+            label: t("analytics.falsePositives"),
             data: buckets.map((bucket) => bucket.false_positives),
             backgroundColor: dismissed,
             ...segment,
@@ -155,40 +158,38 @@ function ConfidenceAudit({ audit, baseOptions, theme, dismissed }) {
         },
       },
     };
-  }, [audit, baseOptions, theme, dismissed]);
+  }, [audit, baseOptions, theme, dismissed, t]);
 
   if (!summary.scored_events) {
     return (
-      <ChartCard title="Model confidence audit" subtitle="No scored incidents in this window">
+      <ChartCard title={t("analytics.modelConfidenceAudit")} subtitle={t("analytics.noScoredIncidentsInThis")}>
         <Typography variant="body2" color="text.secondary">
-          Incidents recorded without a detector confidence are left out of the audit.
+          {t("analytics.incidentsRecordedWithoutADetector")}
         </Typography>
       </ChartCard>
     );
   }
 
   const facts = [
-    { label: "Average confidence", value: formatScore(summary.avg_confidence) },
+    { label: t("analytics.averageConfidence"), value: formatScore(summary.avg_confidence) },
     {
-      label: "Range",
+      label: t("analytics.range"),
       value: `${formatScore(summary.min_confidence, 0)} – ${formatScore(summary.max_confidence, 0)}`,
     },
     {
-      label: `Below ${formatScore(summary.low_confidence_cutoff, 0)}`,
+      label: t("analytics.belowV0", { v0: formatScore(summary.low_confidence_cutoff, 0) }),
       value: `${formatNumber(summary.low_confidence)} (${formatPct(summary.low_confidence_pct)})`,
     },
-    { label: "Avg on resolved", value: formatScore(summary.avg_confidence_resolved) },
-    { label: "Avg on false positives", value: formatScore(summary.avg_confidence_false_positive) },
+    { label: t("analytics.avgOnResolved"), value: formatScore(summary.avg_confidence_resolved) },
+    { label: t("analytics.avgOnFalsePositives"), value: formatScore(summary.avg_confidence_false_positive) },
   ];
 
   return (
     <Card>
       <CardContent>
-        <Typography variant="subtitle2">Model confidence audit</Typography>
+        <Typography variant="subtitle2">{t("analytics.modelConfidenceAudit")}</Typography>
         <Typography variant="caption" color="text.secondary">
-          Peak detector confidence of {formatNumber(summary.scored_events)} incidents. Operator
-          verdicts stand in for ground truth: false positives clustering at low confidence point to
-          the threshold, high-confidence ones to the scene.
+          {t("analytics.peakDetectorConfidenceOfV0", { v0: formatNumber(summary.scored_events) })}
         </Typography>
         <Grid container spacing={3} sx={{ mt: 1 }}>
           <Grid size={{ xs: 12, lg: 8 }}>
@@ -209,8 +210,7 @@ function ConfidenceAudit({ audit, baseOptions, theme, dismissed }) {
                 </Stack>
               ))}
               <Typography variant="caption" color="text.disabled">
-                Lowest per-kind threshold {formatScore(summary.threshold, 0)}: a box below it is
-                never counted.
+                {t("analytics.lowestPerKindThresholdV0", { v0: formatScore(summary.threshold, 0) })}
               </Typography>
             </Stack>
           </Grid>
@@ -220,18 +220,18 @@ function ConfidenceAudit({ audit, baseOptions, theme, dismissed }) {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Camera</TableCell>
-              <TableCell align="right">Incidents</TableCell>
-              <TableCell align="right">Avg</TableCell>
-              <TableCell align="right">Min – max</TableCell>
-              <TableCell align="right">Low confidence</TableCell>
-              <TableCell align="right">False positives</TableCell>
+              <TableCell>{t("analytics.camera")}</TableCell>
+              <TableCell align="right">{t("analytics.incidents")}</TableCell>
+              <TableCell align="right">{t("analytics.avg")}</TableCell>
+              <TableCell align="right">{t("analytics.minMax")}</TableCell>
+              <TableCell align="right">{t("analytics.lowConfidence")}</TableCell>
+              <TableCell align="right">{t("analytics.falsePositives")}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {audit.by_camera.map((row) => (
               <TableRow key={row.camera_id || "deleted"} hover>
-                <TableCell>{row.camera_name || "Deleted camera"}</TableCell>
+                <TableCell>{row.camera_name || t("analytics.deletedCamera")}</TableCell>
                 <TableCell align="right">{formatNumber(row.events)}</TableCell>
                 <TableCell align="right">{formatScore(row.avg_confidence)}</TableCell>
                 <TableCell align="right">
@@ -251,6 +251,7 @@ function ConfidenceAudit({ audit, baseOptions, theme, dismissed }) {
 }
 
 export default function Analytics() {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [days, setDays] = useState(7);
   const [cameraId, setCameraId] = useState("");
@@ -356,8 +357,8 @@ export default function Analytics() {
           dayjs(point.bucket_start).format(hourly ? "HH:mm" : "MMM D")
         ),
         datasets: [
-          { label: "Fire", data: points.map((point) => point.fire), backgroundColor: KIND_COLOR.fire, ...segment },
-          { label: "Smoke", data: points.map((point) => point.smoke), backgroundColor: KIND_COLOR.smoke, ...segment },
+          { label: t("analytics.fire"), data: points.map((point) => point.fire), backgroundColor: KIND_COLOR.fire, ...segment },
+          { label: t("analytics.smoke"), data: points.map((point) => point.smoke), backgroundColor: KIND_COLOR.smoke, ...segment },
         ],
       },
       options: {
@@ -385,7 +386,7 @@ export default function Analytics() {
         },
       },
     };
-  }, [summary, hourly, baseOptions, segment]);
+  }, [summary, hourly, baseOptions, segment, t]);
 
   // InsightEye's "Fire & Smoke Detections by Camera", over incidents.
   const byCamera = useMemo(() => {
@@ -449,8 +450,8 @@ export default function Analytics() {
       data: {
         labels: rows.map((row) => String(row.hour).padStart(2, "0")),
         datasets: [
-          { label: "Fire", data: rows.map((row) => row.fire), backgroundColor: KIND_COLOR.fire, ...segment },
-          { label: "Smoke", data: rows.map((row) => row.smoke), backgroundColor: KIND_COLOR.smoke, ...segment },
+          { label: t("analytics.fire"), data: rows.map((row) => row.fire), backgroundColor: KIND_COLOR.fire, ...segment },
+          { label: t("analytics.smoke"), data: rows.map((row) => row.smoke), backgroundColor: KIND_COLOR.smoke, ...segment },
         ],
       },
       options: {
@@ -465,15 +466,15 @@ export default function Analytics() {
         },
       },
     };
-  }, [summary, baseOptions, segment]);
+  }, [summary, baseOptions, segment, t]);
 
   const funnel = summary?.funnel;
   const funnelStages = funnel
     ? [
-        { key: "detected", label: "Incidents detected", value: funnel.detected, color: "error" },
+        { key: "detected", label: t("analytics.incidentsDetected"), value: funnel.detected, color: "error" },
         {
           key: "acknowledged",
-          label: "Acknowledged",
+          label: t("analytics.acknowledged"),
           value: funnel.acknowledged,
           color: "warning",
           caption: funnel.detected
@@ -482,7 +483,7 @@ export default function Analytics() {
         },
         {
           key: "resolved",
-          label: "Resolved",
+          label: t("analytics.resolved"),
           value: funnel.resolved,
           color: "success",
           caption: funnel.detected
@@ -491,7 +492,7 @@ export default function Analytics() {
         },
         {
           key: "false",
-          label: "False positives",
+          label: t("analytics.falsePositives"),
           value: funnel.false_positives,
           color: "inherit",
           caption: funnel.detected ? `${formatPct(share(funnel.false_positives, funnel.detected))} of incidents` : null,
@@ -505,19 +506,19 @@ export default function Analytics() {
   return (
     <Box>
       <PageHeader
-        title="Analytics"
-        subtitle={`Fire and smoke incidents: when, where, how often the detector sees them, and how fast they were handled. Times in ${TIMEZONE}.`}
+        title={t("analytics.analytics")}
+        subtitle={t("analytics.fireAndSmokeIncidentsWhen", { TIMEZONE })}
         actions={
           <>
             <TextField
               select
               size="small"
-              label="Camera"
+              label={t("analytics.camera")}
               value={cameraId}
               onChange={(event) => setCameraId(event.target.value)}
               sx={{ minWidth: 200 }}
             >
-              <MenuItem value="">All cameras</MenuItem>
+              <MenuItem value="">{t("analytics.allCameras")}</MenuItem>
               {(cameraList.data || []).map((camera) => (
                 <MenuItem key={camera.camera_id} value={camera.camera_id}>
                   {camera.name}
@@ -527,7 +528,7 @@ export default function Analytics() {
             <TextField
               select
               size="small"
-              label="Window"
+              label={t("analytics.window")}
               value={days}
               onChange={(event) => setDays(Number(event.target.value))}
               sx={{ minWidth: 160 }}
@@ -542,49 +543,49 @@ export default function Analytics() {
         }
       />
 
-      <ErrorState error={error} onRetry={refresh} title="Could not load analytics" />
+      <ErrorState error={error} onRetry={refresh} title={t("analytics.couldNotLoadAnalytics")} />
 
       {!summary && loading ? (
-        <Loading label="Aggregating…" height={360} />
+        <Loading label={t("analytics.aggregating")} height={360} />
       ) : summary ? (
         // A refetch dims the previous numbers instead of blanking the page.
         <Box sx={{ opacity: loading ? 0.55 : 1, transition: "opacity 150ms" }}>
           <Grid container spacing={2} sx={{ mb: 2 }}>
             <Grid size={{ xs: 6, md: 3 }}>
               <StatCard
-                label="Incidents"
+                label={t("analytics.incidents")}
                 value={formatNumber(kpis.events)}
-                hint={`${formatNumber(kpis.fire)} fire · ${formatNumber(kpis.smoke)} smoke · ${formatNumber(kpis.open)} open`}
+                hint={t("analytics.v0FireV1SmokeV2", { v0: formatNumber(kpis.fire), v1: formatNumber(kpis.smoke), v2: formatNumber(kpis.open) })}
                 icon={<LocalFireDepartmentIcon />}
                 color="error"
               />
             </Grid>
             <Grid size={{ xs: 6, md: 3 }}>
               <StatCard
-                label="Detection rate"
+                label={t("analytics.detectionRate")}
                 value={formatPct(
                   kpis.checks ? (kpis.fire_detection_rate || 0) + (kpis.smoke_detection_rate || 0) : null,
                   2
                 )}
-                hint={`fire ${formatPct(kpis.fire_detection_rate, 2)} · smoke ${formatPct(kpis.smoke_detection_rate, 2)} of ${formatNumber(kpis.checks)} checks`}
+                hint={t("analytics.fireV0SmokeV1Of", { v0: formatPct(kpis.fire_detection_rate, 2), v1: formatPct(kpis.smoke_detection_rate, 2), v2: formatNumber(kpis.checks) })}
                 icon={<SensorsIcon />}
                 color="warning"
               />
             </Grid>
             <Grid size={{ xs: 6, md: 3 }}>
               <StatCard
-                label="Median time to acknowledge"
+                label={t("analytics.medianTimeToAcknowledge")}
                 value={formatDuration(kpis.median_ack_s)}
-                hint={`resolve: ${formatDuration(kpis.median_resolve_s)} · in view ${formatDuration(kpis.avg_duration_s)} on average`}
+                hint={t("analytics.resolveV0InViewV1", { v0: formatDuration(kpis.median_resolve_s), v1: formatDuration(kpis.avg_duration_s) })}
                 icon={<TimerIcon />}
                 color="info"
               />
             </Grid>
             <Grid size={{ xs: 6, md: 3 }}>
               <StatCard
-                label="False-positive rate"
+                label={t("analytics.falsePositiveRate")}
                 value={formatPct(kpis.false_positive_pct)}
-                hint={`${formatNumber(kpis.false_positives)} dismissed · ${formatNumber(kpis.cameras_affected)} camera(s) affected`}
+                hint={t("analytics.v0DismissedV1CameraS", { v0: formatNumber(kpis.false_positives), v1: formatNumber(kpis.cameras_affected) })}
                 icon={<BlockIcon />}
                 color="secondary"
               />
@@ -594,16 +595,16 @@ export default function Analytics() {
           {!hasEvents ? (
             <Card sx={{ mb: 2 }}>
               <EmptyState
-                title={`No incidents in the ${windowLabel}`}
-                description="No camera confirmed fire or smoke in this window. Try a longer window or another camera."
+                title={t("analytics.noIncidentsInTheWindowlabel", { windowLabel })}
+                description={t("analytics.noCameraConfirmedFireOr")}
               />
             </Card>
           ) : (
             <Grid container spacing={2} sx={{ mb: 2 }}>
               <Grid size={12}>
                 <ChartCard
-                  title={hourly ? "Incidents per hour" : "Incidents per day"}
-                  subtitle={`${formatNumber(kpis.fire)} fire and ${formatNumber(kpis.smoke)} smoke incidents`}
+                  title={hourly ? t("analytics.incidentsPerHour") : t("analytics.incidentsPerDay")}
+                  subtitle={t("analytics.v0FireAndV1Smoke", { v0: formatNumber(kpis.fire), v1: formatNumber(kpis.smoke) })}
                 >
                   <Box sx={{ height: 280 }}>
                     <Bar data={trend.data} options={trend.options} />
@@ -613,8 +614,8 @@ export default function Analytics() {
 
               <Grid size={{ xs: 12, lg: 6 }}>
                 <ChartCard
-                  title="Fire & smoke by camera"
-                  subtitle="Incidents per camera, all cameras; darker bars see it in more of their checks (10% / 30%)"
+                  title={t("analytics.fireSmokeByCamera")}
+                  subtitle={t("analytics.incidentsPerCameraAllCameras")}
                 >
                   {byCamera.data.labels.length ? (
                     <Box sx={{ height: byCamera.height }}>
@@ -622,14 +623,14 @@ export default function Analytics() {
                     </Box>
                   ) : (
                     <Typography variant="body2" color="text.secondary">
-                      {perCamera.error || "Loading…"}
+                      {perCamera.error || t("analytics.loading")}
                     </Typography>
                   )}
                 </ChartCard>
               </Grid>
 
               <Grid size={{ xs: 12, lg: 6 }}>
-                <ChartCard title="By hour of day" subtitle="When incidents are confirmed">
+                <ChartCard title={t("analytics.byHourOfDay")} subtitle={t("analytics.whenIncidentsAreConfirmed")}>
                   <Box sx={{ height: 260 }}>
                     <Bar data={byHour.data} options={byHour.options} />
                   </Box>
@@ -638,15 +639,15 @@ export default function Analytics() {
 
               <Grid size={{ xs: 12, lg: 8 }}>
                 <ChartCard
-                  title="Weekday × hour"
-                  subtitle="Incidents by weekday and hour of day — hover a cell for the count"
+                  title={t("analytics.weekdayHour")}
+                  subtitle={t("analytics.incidentsByWeekdayAndHour")}
                 >
                   <HourHeatmap cells={summary.heatmap} />
                 </ChartCard>
               </Grid>
 
               <Grid size={{ xs: 12, lg: 4 }}>
-                <ChartCard title="Triage" subtitle={`Over the ${windowLabel}`}>
+                <ChartCard title={t("analytics.triage")} subtitle={t("analytics.overTheWindowlabel", { windowLabel })}>
                   <Funnel stages={funnelStages} />
                 </ChartCard>
               </Grid>
@@ -663,7 +664,7 @@ export default function Analytics() {
                   <ErrorState
                     error={audit.error}
                     onRetry={audit.refresh}
-                    title="Could not load the confidence audit"
+                    title={t("analytics.couldNotLoadTheConfidence")}
                   />
                 )}
               </Grid>
@@ -676,15 +677,15 @@ export default function Analytics() {
                 <CardContent sx={{ pb: 0 }}>
                   <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
                     <Box>
-                      <Typography variant="subtitle2">High-risk cameras</Typography>
+                      <Typography variant="subtitle2">{t("analytics.highRiskCameras")}</Typography>
                       <Typography variant="caption" color="text.secondary">
-                        At or above the detection-rate threshold, or with any fire incident.
+                        {t("analytics.atOrAboveTheDetection")}
                       </Typography>
                     </Box>
                     <TextField
                       size="small"
                       type="number"
-                      label="Threshold %"
+                      label={t("analytics.threshold")}
                       value={threshold}
                       onChange={(event) =>
                         setThreshold(Math.min(100, Math.max(0, Number(event.target.value) || 0)))
@@ -699,10 +700,10 @@ export default function Analytics() {
                   <Table size="small" data-testid="high-risk-table">
                     <TableHead>
                       <TableRow>
-                        <TableCell>Camera</TableCell>
-                        <TableCell align="right">Fire</TableCell>
-                        <TableCell align="right">Smoke</TableCell>
-                        <TableCell align="right">Detection rate</TableCell>
+                        <TableCell>{t("analytics.camera")}</TableCell>
+                        <TableCell align="right">{t("analytics.fire")}</TableCell>
+                        <TableCell align="right">{t("analytics.smoke")}</TableCell>
+                        <TableCell align="right">{t("analytics.detectionRate")}</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -722,7 +723,7 @@ export default function Analytics() {
                         <TableRow>
                           <TableCell colSpan={4}>
                             <Typography variant="body2" color="text.secondary">
-                              No camera reaches {threshold}% in the {windowLabel}.
+                              {t("analytics.noCameraReachesThresholdIn", { threshold, windowLabel })}
                             </Typography>
                           </TableCell>
                         </TableRow>
@@ -738,15 +739,15 @@ export default function Analytics() {
                 <CardContent sx={{ pb: 0 }}>
                   <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
                     <Box>
-                      <Typography variant="subtitle2">By location</Typography>
+                      <Typography variant="subtitle2">{t("analytics.byLocation")}</Typography>
                       <Typography variant="caption" color="text.secondary">
-                        Every camera's numbers added up per {groupLabel.toLowerCase()}.
+                        {t("analytics.everyCameraSNumbersAdded", { v0: groupLabel.toLowerCase() })}
                       </Typography>
                     </Box>
                     <TextField
                       select
                       size="small"
-                      label="Group by"
+                      label={t("analytics.groupBy")}
                       value={groupBy}
                       onChange={(event) => setGroupBy(event.target.value)}
                       sx={{ minWidth: 140 }}
@@ -765,10 +766,10 @@ export default function Analytics() {
                     <TableHead>
                       <TableRow>
                         <TableCell>{groupLabel}</TableCell>
-                        <TableCell align="right">Cameras</TableCell>
-                        <TableCell align="right">Fire</TableCell>
-                        <TableCell align="right">Smoke</TableCell>
-                        <TableCell align="right">Detection rate</TableCell>
+                        <TableCell align="right">{t("analytics.cameras")}</TableCell>
+                        <TableCell align="right">{t("analytics.fire")}</TableCell>
+                        <TableCell align="right">{t("analytics.smoke")}</TableCell>
+                        <TableCell align="right">{t("analytics.detectionRate")}</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -790,10 +791,9 @@ export default function Analytics() {
             <Grid size={12}>
               <Card>
                 <CardContent sx={{ pb: 0 }}>
-                  <Typography variant="subtitle2">Camera breakdown</Typography>
+                  <Typography variant="subtitle2">{t("analytics.cameraBreakdown")}</Typography>
                   <Typography variant="caption" color="text.secondary">
-                    Detection rate is the share of the detector's checks that saw fire or smoke; days
-                    count the days with at least one incident.
+                    {t("analytics.detectionRateIsTheShare")}
                   </Typography>
                 </CardContent>
                 <ErrorState error={perCamera.error} onRetry={perCamera.refresh} />
@@ -801,14 +801,14 @@ export default function Analytics() {
                   <Table size="small">
                     <TableHead>
                       <TableRow>
-                        <TableCell>Camera</TableCell>
-                        <TableCell align="right">Fire</TableCell>
-                        <TableCell align="right">Smoke</TableCell>
-                        <TableCell align="right">Days (fire / smoke)</TableCell>
-                        <TableCell align="right">Fire rate</TableCell>
-                        <TableCell align="right">Smoke rate</TableCell>
-                        <TableCell align="right">Checks</TableCell>
-                        <TableCell>Last fire</TableCell>
+                        <TableCell>{t("analytics.camera")}</TableCell>
+                        <TableCell align="right">{t("analytics.fire")}</TableCell>
+                        <TableCell align="right">{t("analytics.smoke")}</TableCell>
+                        <TableCell align="right">{t("analytics.daysFireSmoke")}</TableCell>
+                        <TableCell align="right">{t("analytics.fireRate")}</TableCell>
+                        <TableCell align="right">{t("analytics.smokeRate")}</TableCell>
+                        <TableCell align="right">{t("analytics.checks")}</TableCell>
+                        <TableCell>{t("analytics.lastFire")}</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>

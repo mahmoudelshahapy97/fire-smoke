@@ -22,12 +22,14 @@ import { useToast } from "../../components/Toast";
 import { ErrorState, Loading } from "../../components/DataStates";
 import PageHeader from "../../components/PageHeader";
 import { parseJsonField } from "../../utils/format";
+import { useTranslation } from "react-i18next";
+import i18n from "i18next";
 
 const LOCATION_FIELDS = [
-  { key: "building", label: "Building", placeholder: "Warehouse A", max: 100 },
-  { key: "floor_level", label: "Floor", placeholder: "2", max: 20 },
-  { key: "zone", label: "Zone", placeholder: "Loading bay", max: 100 },
-  { key: "area", label: "Area", placeholder: "Dock 3", max: 100 },
+  { key: "building", get label() { return i18n.t("cameraForm.building"); }, get placeholder() { return i18n.t("cameraForm.phBuilding"); }, max: 100 },
+  { key: "floor_level", get label() { return i18n.t("cameraForm.floor"); }, placeholder: "2", max: 20 },
+  { key: "zone", get label() { return i18n.t("cameraForm.zone"); }, get placeholder() { return i18n.t("cameraForm.phZone"); }, max: 100 },
+  { key: "area", get label() { return i18n.t("cameraForm.area"); }, get placeholder() { return i18n.t("cameraForm.phArea"); }, max: 100 },
 ];
 
 /**
@@ -40,51 +42,51 @@ const LOCATION_FIELDS = [
 const OVERRIDE_FIELDS = [
   {
     key: "fire_confidence",
-    label: "Fire confidence",
+    get label() { return i18n.t("cameraForm.fireConfidence"); },
     unit: "0-1",
-    help: "A fire box needs at least this score to count. InsightEye used 0.5.",
+    get help() { return i18n.t("cameraForm.aFireBoxNeedsAt"); },
     min: 0.05,
     max: 1,
     step: 0.05,
   },
   {
     key: "smoke_confidence",
-    label: "Smoke confidence",
+    get label() { return i18n.t("cameraForm.smokeConfidence"); },
     unit: "0-1",
-    help: "The same for smoke. Lower it for a camera that sees smoke only faintly.",
+    get help() { return i18n.t("cameraForm.theSameForSmokeLower"); },
     min: 0.05,
     max: 1,
     step: 0.05,
   },
   {
     key: "confirm_hits",
-    label: "Confirm after",
+    get label() { return i18n.t("cameraForm.confirmAfter"); },
     unit: "checks",
-    help: "Sightings needed within the window below before the alert goes out.",
+    get help() { return i18n.t("cameraForm.sightingsNeededWithinTheWindow"); },
     min: 1,
     max: 30,
   },
   {
     key: "confirm_window",
-    label: "Out of the last",
+    get label() { return i18n.t("cameraForm.outOfTheLast"); },
     unit: "checks",
-    help: "The detector checks about twice a second, so 5 checks is 2.5 s.",
+    get help() { return i18n.t("cameraForm.theDetectorChecksAboutTwice"); },
     min: 1,
     max: 30,
   },
   {
     key: "clear_after_s",
-    label: "Clear after",
+    get label() { return i18n.t("cameraForm.clearAfter"); },
     unit: "s",
-    help: "An incident closes once nothing has been seen for this long.",
+    get help() { return i18n.t("cameraForm.anIncidentClosesOnceNothing"); },
     min: 1,
     max: 3600,
   },
   {
     key: "cooldown_s",
-    label: "Cooldown",
+    get label() { return i18n.t("cameraForm.cooldown"); },
     unit: "s",
-    help: "Seen again within this long of clearing, the same incident reopens — no new alert.",
+    get help() { return i18n.t("cameraForm.seenAgainWithinThisLong"); },
     min: 0,
     max: 86400,
   },
@@ -105,21 +107,21 @@ const EMPTY = {
 
 function validate(values) {
   const errors = {};
-  if (!values.name.trim()) errors.name = "Required";
-  else if (values.name.length > 120) errors.name = "At most 120 characters";
+  if (!values.name.trim()) errors.name = i18n.t("cameraForm.required");
+  else if (values.name.length > 120) errors.name = i18n.t("cameraForm.atMost120Characters");
 
-  if (!values.rtsp_url.trim()) errors.rtsp_url = "Required";
-  if (values.location.length > 200) errors.location = "At most 200 characters";
+  if (!values.rtsp_url.trim()) errors.rtsp_url = i18n.t("cameraForm.required");
+  if (values.location.length > 200) errors.location = i18n.t("cameraForm.atMost200Characters");
   LOCATION_FIELDS.forEach(({ key, max }) => {
-    if (values[key].length > max) errors[key] = `At most ${max} characters`;
+    if (values[key].length > max) errors[key] = i18n.t("cameraForm.atMostMaxCharacters", { max });
   });
 
   OVERRIDE_FIELDS.forEach(({ key, min, max }) => {
     const raw = values[key];
     if (raw === "" || raw === null || raw === undefined) return;
     const value = Number(raw);
-    if (Number.isNaN(value)) errors[key] = "Must be a number";
-    else if (value < min || value > max) errors[key] = `Between ${min} and ${max}`;
+    if (Number.isNaN(value)) errors[key] = i18n.t("cameraForm.mustBeANumber");
+    else if (value < min || value > max) errors[key] = i18n.t("cameraForm.betweenMinAndMax", { min, max });
   });
 
   // The backend clamps hits to the window, but asking for 6 of 5 is a typo
@@ -127,16 +129,17 @@ function validate(values) {
   const hits = values.confirm_hits === "" ? null : Number(values.confirm_hits);
   const window = values.confirm_window === "" ? null : Number(values.confirm_window);
   if (hits !== null && window !== null && hits > window) {
-    errors.confirm_hits = "Cannot exceed the window";
+    errors.confirm_hits = i18n.t("cameraForm.cannotExceedTheWindow");
   }
   if (!values.kind_fire && !values.kind_smoke) {
-    errors.kinds = "Alert on at least one of fire and smoke";
+    errors.kinds = i18n.t("cameraForm.alertOnAtLeastOne");
   }
 
   return errors;
 }
 
 export default function CameraForm() {
+  const { t } = useTranslation();
   const { cameraId } = useParams();
   const isEdit = Boolean(cameraId);
   const navigate = useNavigate();
@@ -212,11 +215,11 @@ export default function CameraForm() {
     try {
       if (isEdit) {
         await camerasApi.update(cameraId, payload);
-        toast.success(`Camera "${payload.name}" updated.`);
+        toast.success(t("cameraForm.cameraNameUpdated", { name: payload.name }));
         navigate(`/cameras/${cameraId}`);
       } else {
         const created = await camerasApi.create(payload);
-        toast.success(`Camera "${created.name}" registered.`);
+        toast.success(t("cameraForm.cameraNameRegistered", { name: created.name }));
         navigate(`/cameras/${created.camera_id}`);
       }
     } catch (err) {
@@ -226,7 +229,7 @@ export default function CameraForm() {
     }
   };
 
-  if (isEdit && loading && !camera) return <Loading label="Loading camera…" />;
+  if (isEdit && loading && !camera) return <Loading label={t("cameraForm.loadingCamera")} />;
   if (isEdit && loadError) return <ErrorState error={loadError} onRetry={refresh} />;
 
   return (
@@ -236,15 +239,15 @@ export default function CameraForm() {
         onClick={() => navigate(isEdit ? `/cameras/${cameraId}` : "/cameras")}
         sx={{ mb: 2 }}
       >
-        Back
+        {t("cameraForm.back")}
       </Button>
 
       <PageHeader
-        title={isEdit ? `Edit ${camera?.name || "camera"}` : "Register a camera"}
+        title={isEdit ? t("cameraForm.editV0", { v0: camera?.name || "camera" }) : t("cameraForm.registerACamera")}
         subtitle={
           isEdit
-            ? "A running worker is restarted when you save, so changes take effect at once."
-            : "An enabled camera starts watching for fire and smoke as soon as it is saved."
+            ? t("cameraForm.aRunningWorkerIsRestarted")
+            : t("cameraForm.anEnabledCameraStartsWatching")
         }
       />
 
@@ -254,38 +257,37 @@ export default function CameraForm() {
             <Card>
               <CardContent>
                 <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>
-                  Source
+                  {t("cameraForm.source")}
                 </Typography>
                 <Stack spacing={2.5}>
                   <TextField
-                    label="Name"
+                    label={t("cameraForm.name")}
                     value={values.name}
                     onChange={setField("name")}
                     error={Boolean(errors.name)}
-                    helperText={errors.name || "Must be unique within this workspace."}
+                    helperText={errors.name || t("cameraForm.mustBeUniqueWithinThis")}
                     required
                     fullWidth
                     autoFocus
                   />
                   <TextField
-                    label="RTSP URL"
+                    label={t("cameraForm.rtspUrl")}
                     value={values.rtsp_url}
                     onChange={setField("rtsp_url")}
                     error={Boolean(errors.rtsp_url)}
                     helperText={
                       errors.rtsp_url ||
-                      "rtsp://user:pass@host:554/stream, or a file path inside the API container for testing."
+                      t("cameraForm.rtspUserPassHost554")
                     }
                     required
                     fullWidth
-                    placeholder="rtsp://mediamtx:8554/fire1"
+                    placeholder={t("cameraForm.rtspMediamtx8554Fire1")}
                   />
                   <Typography variant="subtitle2" sx={{ pt: 1 }}>
-                    Where it looks
+                    {t("cameraForm.whereItLooks")}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" sx={{ mt: "4px !important" }}>
-                    Alerts read "Building - Floor n - Zone - Area", so responders know where to go.
-                    Analytics can group cameras by any of them.
+                    {t("cameraForm.alertsReadBuildingFloorN")}
                   </Typography>
                   <Grid container spacing={2}>
                     {LOCATION_FIELDS.map(({ key, label, placeholder }) => (
@@ -303,19 +305,19 @@ export default function CameraForm() {
                     ))}
                   </Grid>
                   <TextField
-                    label="Location"
+                    label={t("cameraForm.location")}
                     value={values.location}
                     onChange={setField("location")}
                     error={Boolean(errors.location)}
                     helperText={
-                      errors.location || "Free-form; used in alerts when the fields above are empty."
+                      errors.location || t("cameraForm.freeFormUsedInAlerts")
                     }
                     fullWidth
-                    placeholder="North entrance, by the stairs"
+                    placeholder={t("cameraForm.northEntranceByTheStairs")}
                   />
                   <FormControlLabel
                     control={<Switch checked={values.enabled} onChange={setField("enabled")} />}
-                    label="Enabled"
+                    label={t("cameraForm.enabled")}
                   />
                 </Stack>
               </CardContent>
@@ -326,21 +328,20 @@ export default function CameraForm() {
             <Card>
               <CardContent>
                 <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                  Detection
+                  {t("cameraForm.detection")}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 2 }}>
-                  Leave a field blank to inherit the global value from the API's environment. A
-                  blank is not zero.
+                  {t("cameraForm.leaveAFieldBlankTo")}
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
                 <Stack direction="row" spacing={2} sx={{ mb: 1 }}>
                   <FormControlLabel
                     control={<Switch checked={values.kind_fire} onChange={setField("kind_fire")} />}
-                    label="Alert on fire"
+                    label={t("cameraForm.alertOnFire")}
                   />
                   <FormControlLabel
                     control={<Switch checked={values.kind_smoke} onChange={setField("kind_smoke")} />}
-                    label="Alert on smoke"
+                    label={t("cameraForm.alertOnSmoke")}
                   />
                 </Stack>
                 {errors.kinds ? (
@@ -380,14 +381,14 @@ export default function CameraForm() {
             ) : null}
             <Stack direction="row" spacing={1}>
               <Button type="submit" variant="contained" disabled={saving}>
-                {saving ? "Saving…" : isEdit ? "Save changes" : "Register camera"}
+                {saving ? t("cameraForm.saving") : isEdit ? t("cameraForm.saveChanges") : t("cameraForm.registerCamera")}
               </Button>
               <Button
                 color="inherit"
                 disabled={saving}
                 onClick={() => navigate(isEdit ? `/cameras/${cameraId}` : "/cameras")}
               >
-                Cancel
+                {t("cameraForm.cancel")}
               </Button>
             </Stack>
           </Grid>

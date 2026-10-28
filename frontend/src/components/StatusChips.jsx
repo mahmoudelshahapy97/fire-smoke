@@ -5,18 +5,20 @@ import CloudIcon from "@mui/icons-material/Cloud";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import { EVENT_STATUS_COLOR, LIVE_STATUS_COLOR } from "../utils/constants";
 import { titleCase } from "../utils/format";
+import { useTranslation } from "react-i18next";
+import i18n from "i18next";
 
 const EVENT_HINT = {
-  OPEN: "Nobody has acknowledged this alert yet",
-  ACKNOWLEDGED: "Someone is dealing with it",
-  RESOLVED: "Handled: put out, or confirmed safe",
-  FALSE_POSITIVE: "There was no fire or smoke",
+  get OPEN() { return i18n.t("statusChips.nobodyHasAcknowledgedThisAlert"); },
+  get ACKNOWLEDGED() { return i18n.t("statusChips.someoneIsDealingWithIt"); },
+  get RESOLVED() { return i18n.t("statusChips.handledPutOutOrConfirmed"); },
+  get FALSE_POSITIVE() { return i18n.t("statusChips.thereWasNoFireOr"); },
 };
 
 const LIVE_HINT = {
-  fire: "Fire is in view right now",
-  smoke: "Smoke is in view right now",
-  clear: "No fire or smoke in view",
+  get fire() { return i18n.t("statusChips.fireIsInViewRight"); },
+  get smoke() { return i18n.t("statusChips.smokeIsInViewRight"); },
+  get clear() { return i18n.t("statusChips.noFireOrSmokeIn"); },
 };
 
 const KIND_ICON = {
@@ -69,15 +71,16 @@ export function KindChip({ kind, size = "small", ...props }) {
 
 /** A camera's live status: fire, smoke or clear. Unknown while no worker runs. */
 export function LiveStatusChip({ status, size = "small", ...props }) {
+  const { t } = useTranslation();
   if (!status) {
-    return <Chip label="Not watching" size={size} variant="outlined" {...props} />;
+    return <Chip label={t("statusChips.notWatching")} size={size} variant="outlined" {...props} />;
   }
   const alerting = status !== "clear";
   return (
     <Tooltip title={LIVE_HINT[status] || ""}>
       <Chip
         icon={KIND_ICON[status]}
-        label={alerting ? `${titleCase(status)} detected` : "Clear"}
+        label={alerting ? t("statusChips.v0Detected", { v0: titleCase(status) }) : t("statusChips.clear")}
         color={LIVE_STATUS_COLOR[status] || "default"}
         size={size}
         variant={alerting ? "filled" : "outlined"}
@@ -89,10 +92,11 @@ export function LiveStatusChip({ status, size = "small", ...props }) {
 
 /** Whether the camera still sees the incident, or it has cleared. */
 export function LiveChip({ live, size = "small", ...props }) {
+  const { t } = useTranslation();
   return (
-    <Tooltip title={live ? "Still being seen by the camera" : "No longer in view"}>
+    <Tooltip title={live ? t("statusChips.stillBeingSeenByThe") : t("statusChips.noLongerInView")}>
       <Chip
-        label={live ? "Live" : "Cleared"}
+        label={live ? t("statusChips.live") : t("statusChips.cleared")}
         color={live ? "error" : "default"}
         size={size}
         variant={live ? "filled" : "outlined"}
@@ -104,9 +108,10 @@ export function LiveChip({ live, size = "small", ...props }) {
 
 /** Whether a camera is configured to run, which is not whether it *is* running. */
 export function EnabledChip({ enabled, size = "small", ...props }) {
+  const { t } = useTranslation();
   return (
     <Chip
-      label={enabled ? "Enabled" : "Disabled"}
+      label={enabled ? t("statusChips.enabled") : t("statusChips.disabled")}
       color={enabled ? "success" : "default"}
       size={size}
       variant={enabled ? "filled" : "outlined"}
@@ -117,19 +122,20 @@ export function EnabledChip({ enabled, size = "small", ...props }) {
 
 /** Whether a worker exists for this camera right now, and whether it has a stream. */
 export function WorkerChip({ worker, size = "small", ...props }) {
+  const { t } = useTranslation();
   if (!worker || !worker.running) {
-    return <Chip label="Stopped" size={size} variant="outlined" {...props} />;
+    return <Chip label={t("statusChips.stopped")} size={size} variant="outlined" {...props} />;
   }
   return (
     <Tooltip
       title={
         worker.connected
-          ? `${worker.frames_processed ?? 0} frames processed`
-          : "Worker is up but the RTSP source is not answering"
+          ? t("statusChips.v0FramesProcessed", { v0: worker.frames_processed ?? 0 })
+          : t("statusChips.workerIsUpButThe")
       }
     >
       <Chip
-        label={worker.connected ? "Streaming" : "Reconnecting"}
+        label={worker.connected ? t("statusChips.streaming") : t("statusChips.reconnecting")}
         color={worker.connected ? "success" : "warning"}
         size={size}
         variant="outlined"

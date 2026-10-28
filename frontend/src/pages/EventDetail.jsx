@@ -40,6 +40,8 @@ import {
   shortId,
   titleCase,
 } from "../utils/format";
+import { useTranslation } from "react-i18next";
+import i18n from "i18next";
 
 function DetailRow({ label, children }) {
   return (
@@ -56,29 +58,28 @@ function DetailRow({ label, children }) {
 const TRIAGE = [
   {
     status: EVENT_STATUS.ACKNOWLEDGED,
-    label: "Acknowledge",
+    get label() { return i18n.t("eventDetail.acknowledge"); },
     icon: <CheckCircleOutlineIcon />,
     color: "warning",
   },
-  { status: EVENT_STATUS.RESOLVED, label: "Resolve", icon: <DoneAllIcon />, color: "success" },
+  { status: EVENT_STATUS.RESOLVED, get label() { return i18n.t("eventDetail.resolve"); }, icon: <DoneAllIcon />, color: "success" },
   {
     status: EVENT_STATUS.FALSE_POSITIVE,
-    label: "False positive",
+    get label() { return i18n.t("eventDetail.falsePositive"); },
     icon: <ThumbDownOffAltIcon />,
     color: "inherit",
   },
 ];
 
 const TRIAGE_HINT = {
-  [EVENT_STATUS.ACKNOWLEDGED]:
-    "Someone is on it. The emergency alert stops showing on every console.",
-  [EVENT_STATUS.RESOLVED]: "It was dealt with: put out, or checked and found safe.",
-  [EVENT_STATUS.FALSE_POSITIVE]:
-    "There was no fire or smoke (a reflection, steam, a light). Counted against the detector in analytics.",
+  get [EVENT_STATUS.ACKNOWLEDGED]() { return i18n.t("eventDetail.someoneIsOnItThe"); },
+  get [EVENT_STATUS.RESOLVED]() { return i18n.t("eventDetail.itWasDealtWithPut"); },
+  get [EVENT_STATUS.FALSE_POSITIVE]() { return i18n.t("eventDetail.thereWasNoFireOr"); },
 };
 
 /** Confirms a triage step and records how the alert was handled. */
 function TriageDialog({ open, status, label, initial, busy, onConfirm, onClose }) {
+  const { t } = useTranslation();
   const [actionTaken, setActionTaken] = useState("");
   const [description, setDescription] = useState("");
 
@@ -100,8 +101,8 @@ function TriageDialog({ open, status, label, initial, busy, onConfirm, onClose }
         <DialogContentText sx={{ mb: 2 }}>{TRIAGE_HINT[status]}</DialogContentText>
         <Stack spacing={2}>
           <TextField
-            label="Action taken"
-            placeholder="e.g. Fire team called; extinguished with CO2, logged as FS-1042"
+            label={t("eventDetail.actionTaken")}
+            placeholder={t("eventDetail.eGFireTeamCalled")}
             value={actionTaken}
             onChange={(event) => setActionTaken(event.target.value)}
             inputProps={{ maxLength: 200 }}
@@ -109,7 +110,7 @@ function TriageDialog({ open, status, label, initial, busy, onConfirm, onClose }
             autoFocus
           />
           <TextField
-            label="Notes"
+            label={t("eventDetail.notes")}
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             inputProps={{ maxLength: 2000 }}
@@ -121,14 +122,14 @@ function TriageDialog({ open, status, label, initial, busy, onConfirm, onClose }
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose} disabled={busy} color="inherit">
-          Cancel
+          {t("eventDetail.cancel")}
         </Button>
         <Button
           variant="contained"
           disabled={busy}
           onClick={() => onConfirm({ action_taken: actionTaken.trim(), description: description.trim() })}
         >
-          {busy ? "Working…" : label}
+          {busy ? t("eventDetail.working") : label}
         </Button>
       </DialogActions>
     </Dialog>
@@ -136,6 +137,7 @@ function TriageDialog({ open, status, label, initial, busy, onConfirm, onClose }
 }
 
 export default function EventDetail() {
+  const { t } = useTranslation();
   const { eventId } = useParams();
   const toast = useToast();
   const { hasRole } = useAuth();
@@ -156,7 +158,7 @@ export default function EventDetail() {
       // Empty fields are left out so the notes already stored are kept.
       const filled = Object.fromEntries(Object.entries(notes || {}).filter(([, v]) => v));
       await eventApi.setStatus(eventId, status, filled);
-      toast.success(`Incident marked ${titleCase(status).toLowerCase()}.`);
+      toast.success(t("eventDetail.incidentMarkedV0", { v0: titleCase(status).toLowerCase() }));
       setPending(null);
       refresh();
     } catch (err) {
@@ -174,19 +176,19 @@ export default function EventDetail() {
     return () => clearInterval(timer);
   }, [live, refresh]);
 
-  if (loading && !data) return <Loading label="Loading incident…" />;
+  if (loading && !data) return <Loading label={t("eventDetail.loadingIncident")} />;
   if (error) return <ErrorState error={error} onRetry={refresh} />;
   if (!data) return null;
 
   return (
     <Box>
       <Button component={RouterLink} to="/events" startIcon={<ArrowBackIcon />} sx={{ mb: 2 }}>
-        All incidents
+        {t("eventDetail.allIncidents")}
       </Button>
 
       <PageHeader
-        title={`${titleCase(data.kind)} on ${data.camera_name || "an unknown camera"}`}
-        subtitle={`${data.location_text || "Unknown location"} · ${fromNow(data.detected_at)}`}
+        title={t("eventDetail.v0OnV1", { v0: titleCase(data.kind), v1: data.camera_name || t("eventDetail.anUnknownCamera") })}
+        subtitle={`${data.location_text || t("eventDetail.unknownLocation")} · ${fromNow(data.detected_at)}`}
         actions={
           canTriage &&
           TRIAGE.map(({ status, label, icon, color }) => (
@@ -219,10 +221,10 @@ export default function EventDetail() {
           <Card sx={{ mb: 2 }}>
             <Box sx={{ px: 2.5, py: 1.5 }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                Video
+                {t("eventDetail.video")}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Annotated footage from before the incident was confirmed until after it.
+                {t("eventDetail.annotatedFootageFromBeforeThe")}
               </Typography>
             </Box>
             <Divider />
@@ -237,8 +239,8 @@ export default function EventDetail() {
             ) : (
               <Typography variant="body2" color="text.secondary" sx={{ px: 2.5, py: 3 }}>
                 {data.live
-                  ? "The clip is still recording; it is saved shortly after the alert."
-                  : "No clip recorded for this incident. A clip is saved shortly after the alert fires; older ones are removed by retention."}
+                  ? t("eventDetail.theClipIsStillRecording")
+                  : t("eventDetail.noClipRecordedForThis")}
               </Typography>
             )}
           </Card>
@@ -246,19 +248,19 @@ export default function EventDetail() {
           <Card>
             <Box sx={{ px: 2.5, py: 1.5 }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                Alert frame
+                {t("eventDetail.alertFrame")}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                The annotated frame captured the moment the incident was confirmed.
+                {t("eventDetail.theAnnotatedFrameCapturedThe")}
               </Typography>
             </Box>
             <Divider />
             <ItemImage
               src={eventApi.frameUrl(eventId)}
-              alt={`Annotated frame of the ${data.kind} on ${data.camera_name}`}
+              alt={t("eventDetail.annotatedFrameOfTheKind", { kind: data.kind, camera_name: data.camera_name })}
               height={420}
               fit="contain"
-              fallbackLabel="No frame stored for this incident"
+              fallbackLabel={t("eventDetail.noFrameStoredForThis")}
             />
           </Card>
         </Grid>
@@ -267,33 +269,33 @@ export default function EventDetail() {
           <Card>
             <CardContent>
               <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-                Detection
+                {t("eventDetail.detection")}
               </Typography>
               <Divider />
-              <DetailRow label="Status">
+              <DetailRow label={t("eventDetail.status")}>
                 <EventStatusChip status={data.status} />
               </DetailRow>
-              <DetailRow label="Kind">
+              <DetailRow label={t("eventDetail.kind")}>
                 <Stack direction="row" spacing={1}>
                   <KindChip kind={data.kind} />
                   <LiveChip live={data.live} />
                 </Stack>
               </DetailRow>
-              <DetailRow label="Peak confidence">
+              <DetailRow label={t("eventDetail.peakConfidence")}>
                 <Typography variant="body2">{formatScore(data.peak_confidence)}</Typography>
               </DetailRow>
-              <DetailRow label="Sightings">
+              <DetailRow label={t("eventDetail.sightings")}>
                 <Typography variant="body2">
-                  {data.sightings ?? "—"} check{data.sightings === 1 ? "" : "s"} saw it
+                  {t("eventDetail.v0CheckV1SawIt", { v0: data.sightings ?? "—", v1: data.sightings === 1 ? "" : "s" })}
                 </Typography>
               </DetailRow>
-              <DetailRow label="Peak box">
+              <DetailRow label={t("eventDetail.peakBox")}>
                 <Typography variant="body2" color="text.secondary">
                   {describeBox(data.bbox)}
-                  {data.detections?.length > 1 ? ` (+${data.detections.length - 1} more in that frame)` : ""}
+                  {data.detections?.length > 1 ? t("eventDetail.v0MoreInThatFrame", { v0: data.detections.length - 1 }) : ""}
                 </Typography>
               </DetailRow>
-              <DetailRow label="Location">
+              <DetailRow label={t("eventDetail.location")}>
                 <Typography variant="body2">{data.location_text || "—"}</Typography>
               </DetailRow>
             </CardContent>
@@ -302,33 +304,33 @@ export default function EventDetail() {
           <Card sx={{ mt: 2 }}>
             <CardContent>
               <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-                Timeline
+                {t("eventDetail.timeline")}
               </Typography>
               <Divider />
-              <DetailRow label="First seen">
+              <DetailRow label={t("eventDetail.firstSeen")}>
                 <Typography variant="body2" color="text.secondary">
                   {formatDateTime(data.started_at)}
                 </Typography>
               </DetailRow>
-              <DetailRow label="Confirmed, alert sent">
+              <DetailRow label={t("eventDetail.confirmedAlertSent")}>
                 <Typography variant="body2">{formatDateTime(data.detected_at)}</Typography>
               </DetailRow>
-              <DetailRow label="Last seen">
+              <DetailRow label={t("eventDetail.lastSeen")}>
                 <Typography variant="body2" color="text.secondary">
                   {formatDateTime(data.last_seen_at)}
                 </Typography>
               </DetailRow>
-              <DetailRow label="Cleared">
+              <DetailRow label={t("eventDetail.cleared")}>
                 <Typography variant="body2" color="text.secondary">
-                  {data.cleared_at ? formatDateTime(data.cleared_at) : "Still in view"}
+                  {data.cleared_at ? formatDateTime(data.cleared_at) : t("eventDetail.stillInView")}
                 </Typography>
               </DetailRow>
-              <DetailRow label="In view for">
+              <DetailRow label={t("eventDetail.inViewFor")}>
                 <Typography variant="body2">{formatDuration(incidentSeconds(data))}</Typography>
               </DetailRow>
-              <DetailRow label="Identity">
+              <DetailRow label={t("eventDetail.identity")}>
                 <Typography variant="caption" color="text.disabled">
-                  incident {shortId(data.event_id)}
+                  {t("eventDetail.incidentV0", { v0: shortId(data.event_id) })}
                 </Typography>
               </DetailRow>
             </CardContent>
@@ -338,28 +340,28 @@ export default function EventDetail() {
             <Card sx={{ mt: 2 }}>
               <CardContent>
                 <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-                  Handling
+                  {t("eventDetail.handling")}
                 </Typography>
                 <Divider />
-                <DetailRow label="Acknowledged">
+                <DetailRow label={t("eventDetail.acknowledged")}>
                   <Typography variant="body2" color="text.secondary">
                     {formatDateTime(data.acknowledged_at)}
-                    {data.acknowledged_by_username ? ` by ${data.acknowledged_by_username}` : ""}
+                    {data.acknowledged_by_username ? t("eventDetail.byAcknowledgedByUsername", { acknowledged_by_username: data.acknowledged_by_username }) : ""}
                   </Typography>
                 </DetailRow>
-                <DetailRow label="Closed">
+                <DetailRow label={t("eventDetail.closed")}>
                   <Typography variant="body2" color="text.secondary">
                     {data.resolved_at
                       ? `${formatDateTime(data.resolved_at)}${
                           data.resolved_by_username ? ` by ${data.resolved_by_username}` : ""
                         }`
-                      : "Still open"}
+                      : t("eventDetail.stillOpen")}
                   </Typography>
                 </DetailRow>
-                <DetailRow label="Action taken">
+                <DetailRow label={t("eventDetail.actionTaken")}>
                   <Typography variant="body2">{data.action_taken || "—"}</Typography>
                 </DetailRow>
-                <DetailRow label="Notes">
+                <DetailRow label={t("eventDetail.notes")}>
                   <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
                     {data.description || "—"}
                   </Typography>

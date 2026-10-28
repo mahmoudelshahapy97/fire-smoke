@@ -34,6 +34,7 @@ import { useAsync } from "../hooks/useAsync";
 import { usePolling } from "../hooks/usePolling";
 import { POLL_INTERVAL_MS } from "../utils/constants";
 import { cameraPlace, formatNumber, fromNow } from "../utils/format";
+import { useTranslation } from "react-i18next";
 
 function CameraTile({ camera, worker }) {
   const status = worker?.running ? worker.status : null;
@@ -73,6 +74,7 @@ function CameraTile({ camera, worker }) {
 }
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   // The counters and the camera states are worth polling: a fire has to show
   // up without anyone reaching for refresh.
   const stats = usePolling(({ signal }) => events.stats(undefined, { signal }), {
@@ -109,35 +111,35 @@ export default function Dashboard() {
   return (
     <Box>
       <PageHeader
-        title="Dashboard"
-        subtitle="What every camera sees right now, and the alerts still waiting on someone."
+        title={t("dashboard.dashboard")}
+        subtitle={t("dashboard.whatEveryCameraSeesRight")}
         actions={[
           <Button key="refresh" onClick={refreshAll} startIcon={<RefreshIcon />}>
-            Refresh
+            {t("dashboard.refresh")}
           </Button>,
         ]}
       />
 
-      <ErrorState error={stats.error} onRetry={stats.refresh} title="Could not load the counters" />
+      <ErrorState error={stats.error} onRetry={stats.refresh} title={t("dashboard.couldNotLoadTheCounters")} />
 
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <StatCard
-            label="Open alerts"
+            label={t("dashboard.openAlerts")}
             value={formatNumber(eventStats.open ?? 0)}
-            hint={`${formatNumber(eventStats.live ?? 0)} still in view`}
+            hint={t("dashboard.v0StillInView", { v0: formatNumber(eventStats.live ?? 0) })}
             icon={<NotificationsIcon />}
             color="error"
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <StatCard
-            label="Fire, last 24h"
+            label={t("dashboard.fireLast24h")}
             value={formatNumber(eventStats.fire_24h ?? 0)}
             hint={
               eventStats.last_event_at
-                ? `Latest incident ${fromNow(eventStats.last_event_at)}`
-                : "Nothing yet"
+                ? t("dashboard.latestIncidentV0", { v0: fromNow(eventStats.last_event_at) })
+                : t("dashboard.nothingYet")
             }
             icon={<LocalFireDepartmentIcon />}
             color="error"
@@ -145,18 +147,18 @@ export default function Dashboard() {
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <StatCard
-            label="Smoke, last 24h"
+            label={t("dashboard.smokeLast24h")}
             value={formatNumber(eventStats.smoke_24h ?? 0)}
-            hint="Incidents, not single sightings"
+            hint={t("dashboard.incidentsNotSingleSightings")}
             icon={<CloudIcon />}
             color="warning"
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <StatCard
-            label="Cameras watching"
+            label={t("dashboard.camerasWatching")}
             value={`${formatNumber(watching)} / ${formatNumber(allCameras.length)}`}
-            hint={alerting ? `${alerting} seeing fire or smoke now` : "None alerting"}
+            hint={alerting ? t("dashboard.alertingSeeingFireOrSmoke", { alerting }) : t("dashboard.noneAlerting")}
             icon={<VideocamIcon />}
             color={alerting ? "error" : "success"}
           />
@@ -171,16 +173,16 @@ export default function Dashboard() {
               sx={{ px: 2.5, py: 2 }}
             >
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                Cameras
+                {t("dashboard.cameras")}
               </Typography>
               <Link component={RouterLink} to="/cameras" variant="body2">
-                Manage
+                {t("dashboard.manage")}
               </Link>
             </Stack>
             <Divider />
             <Box sx={{ p: 2 }}>
               {cameraList.loading && !cameraList.data ? (
-                <Loading label="Loading cameras…" height={140} />
+                <Loading label={t("dashboard.loadingCameras")} height={140} />
               ) : allCameras.length ? (
                 <Grid container spacing={2}>
                   {allCameras.map((camera) => (
@@ -191,8 +193,8 @@ export default function Dashboard() {
                 </Grid>
               ) : (
                 <EmptyState
-                  title="No cameras"
-                  description="Register an RTSP source to start watching for fire and smoke."
+                  title={t("dashboard.noCameras")}
+                  description={t("dashboard.registerAnRtspSourceTo")}
                   icon={<VideocamIcon fontSize="inherit" />}
                   action={
                     <Button
@@ -201,7 +203,7 @@ export default function Dashboard() {
                       variant="contained"
                       size="small"
                     >
-                      Add a camera
+                      {t("dashboard.addACamera")}
                     </Button>
                   }
                 />
@@ -219,10 +221,10 @@ export default function Dashboard() {
               sx={{ px: 2.5, py: 2 }}
             >
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                Recent incidents
+                {t("dashboard.recentIncidents")}
               </Typography>
               <Link component={RouterLink} to="/events" variant="body2">
-                View all
+                {t("dashboard.viewAll")}
               </Link>
             </Stack>
             <Divider />
@@ -232,7 +234,7 @@ export default function Dashboard() {
                 <ErrorState error={recent.error} onRetry={recent.refresh} />
               </Box>
             ) : recent.loading && !recent.data ? (
-              <Loading label="Loading incidents…" />
+              <Loading label={t("dashboard.loadingIncidents")} />
             ) : recent.data?.events?.length ? (
               <List disablePadding>
                 {recent.data.events.map((event) => (
@@ -250,7 +252,7 @@ export default function Dashboard() {
                           {event.live && <LiveChip live />}
                         </Stack>
                       }
-                      secondary={`${event.camera_name || "Unknown camera"} · ${
+                      secondary={`${event.camera_name || t("dashboard.unknownCamera")} · ${
                         event.location_text || ""
                       } · ${fromNow(event.detected_at)}`}
                       secondaryTypographyProps={{ sx: { mt: 0.5 } }}
@@ -260,8 +262,8 @@ export default function Dashboard() {
               </List>
             ) : (
               <EmptyState
-                title="No incidents yet"
-                description="An incident appears here once a camera has seen fire or smoke in 3 of its last 5 checks — a single flicker never alarms."
+                title={t("dashboard.noIncidentsYet")}
+                description={t("dashboard.anIncidentAppearsHereOnce")}
               />
             )}
           </Card>

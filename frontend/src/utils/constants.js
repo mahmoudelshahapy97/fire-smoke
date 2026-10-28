@@ -1,3 +1,4 @@
+import i18n from "i18next";
 /**
  * Mirrors the enums in app/schemas/ and app/services/fire_monitor.py — keep the
  * two in step. The CHECK constraints in database/schema.sql are the ultimate
@@ -69,9 +70,9 @@ export const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 /** What analytics may group cameras by (app/services/analytics_service.py). */
 export const LOCATION_GROUPS = [
-  { value: "building", label: "Building" },
-  { value: "floor_level", label: "Floor" },
-  { value: "zone", label: "Zone" },
-  { value: "area", label: "Area" },
-  { value: "location", label: "Location" },
+  { value: "building", get label() { return i18n.t("constants.building"); } },
+  { value: "floor_level", get label() { return i18n.t("constants.floor"); } },
+  { value: "zone", get label() { return i18n.t("constants.zone"); } },
+  { value: "area", get label() { return i18n.t("constants.area"); } },
+  { value: "location", get label() { return i18n.t("constants.location"); } },
 ];

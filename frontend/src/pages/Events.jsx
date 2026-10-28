@@ -23,6 +23,7 @@ import PageHeader from "../components/PageHeader";
 import { EmptyState, ErrorState, Loading } from "../components/DataStates";
 import { EventStatusChip, KindChip, LiveChip } from "../components/StatusChips";
 import { cameras as cameraApi, events as eventApi } from "../api/endpoints";
+import { ExportButton } from "@insighteye/ui";
 import { useAsync } from "../hooks/useAsync";
 import {
   EVENT_KINDS,
@@ -38,6 +39,7 @@ import {
   incidentSeconds,
   titleCase,
 } from "../utils/format";
+import { useTranslation } from "react-i18next";
 
 /** A yyyy-mm-dd input value as an ISO bound for the API: start or end of that local day. */
 const dayBound = (value, end = false) =>
@@ -49,6 +51,7 @@ const dayBound = (value, end = false) =>
  * and can be linked to from the dashboard and from a camera's detail page.
  */
 export default function Events() {
+  const { t } = useTranslation();
   const [params, setParams] = useSearchParams();
 
   const status = params.get("status") || "";
@@ -95,11 +98,12 @@ export default function Events() {
   return (
     <Box>
       <PageHeader
-        title="Incidents"
-        subtitle="Every fire and smoke incident the cameras confirmed, newest first."
+        title={t("events.incidents")}
+        subtitle={t("events.everyFireAndSmokeIncident")}
         actions={[
+          <ExportButton key="export" fetchBlob={() => eventApi.exportBlob({ status: status || undefined, kind: kind || undefined, live: live || undefined, camera_id: cameraId || undefined, start: from ? dayBound(from) : undefined, end: to ? dayBound(to, true) : undefined })} filenameStem="incidents" />,
           <Button key="refresh" onClick={refresh} startIcon={<RefreshIcon />}>
-            Refresh
+            {t("events.refresh")}
           </Button>,
         ]}
       />
@@ -108,13 +112,13 @@ export default function Events() {
         <Stack direction={{ xs: "column", md: "row" }} spacing={2} flexWrap="wrap" useFlexGap>
           <TextField
             select
-            label="Status"
+            label={t("events.status")}
             size="small"
             value={status}
             onChange={(event) => setParam("status", event.target.value)}
             sx={{ minWidth: 180 }}
           >
-            <MenuItem value="">All statuses</MenuItem>
+            <MenuItem value="">{t("events.allStatuses")}</MenuItem>
             {EVENT_STATUSES.map((value) => (
               <MenuItem key={value} value={value}>
                 {titleCase(value)}
@@ -124,13 +128,13 @@ export default function Events() {
 
           <TextField
             select
-            label="Kind"
+            label={t("events.kind")}
             size="small"
             value={kind}
             onChange={(event) => setParam("kind", event.target.value)}
             sx={{ minWidth: 140 }}
           >
-            <MenuItem value="">Fire and smoke</MenuItem>
+            <MenuItem value="">{t("events.fireAndSmoke")}</MenuItem>
             {EVENT_KINDS.map((value) => (
               <MenuItem key={value} value={value}>
                 {titleCase(value)}
@@ -140,26 +144,26 @@ export default function Events() {
 
           <TextField
             select
-            label="In view"
+            label={t("events.inView")}
             size="small"
             value={live}
             onChange={(event) => setParam("live", event.target.value)}
             sx={{ minWidth: 150 }}
           >
-            <MenuItem value="">Live or cleared</MenuItem>
-            <MenuItem value="true">Still live</MenuItem>
-            <MenuItem value="false">Cleared</MenuItem>
+            <MenuItem value="">{t("events.liveOrCleared")}</MenuItem>
+            <MenuItem value="true">{t("events.stillLive")}</MenuItem>
+            <MenuItem value="false">{t("events.cleared")}</MenuItem>
           </TextField>
 
           <TextField
             select
-            label="Camera"
+            label={t("events.camera")}
             size="small"
             value={cameraId}
             onChange={(event) => setParam("camera_id", event.target.value)}
             sx={{ minWidth: 220 }}
           >
-            <MenuItem value="">All cameras</MenuItem>
+            <MenuItem value="">{t("events.allCameras")}</MenuItem>
             {(cameraList.data || []).map((camera) => (
               <MenuItem key={camera.camera_id} value={camera.camera_id}>
                 {camera.name}
@@ -169,7 +173,7 @@ export default function Events() {
 
           <TextField
             type="date"
-            label="From"
+            label={t("events.from")}
             size="small"
             value={from}
             onChange={(event) => setParam("from", event.target.value)}
@@ -177,7 +181,7 @@ export default function Events() {
           />
           <TextField
             type="date"
-            label="To"
+            label={t("events.to")}
             size="small"
             value={to}
             onChange={(event) => setParam("to", event.target.value)}
@@ -186,7 +190,7 @@ export default function Events() {
 
           <Box sx={{ flex: 1 }} />
           {hasFilters ? (
-            <Button onClick={() => setParams(new URLSearchParams())}>Clear filters</Button>
+            <Button onClick={() => setParams(new URLSearchParams())}>{t("events.clearFilters")}</Button>
           ) : null}
         </Stack>
       </Card>
@@ -194,19 +198,19 @@ export default function Events() {
       <ErrorState error={error} onRetry={refresh} />
 
       {loading && !data ? (
-        <Loading label="Loading incidents…" />
+        <Loading label={t("events.loadingIncidents")} />
       ) : rows.length ? (
         <Card>
           <TableContainer>
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>Kind</TableCell>
-                  <TableCell>Camera</TableCell>
-                  <TableCell>Detected</TableCell>
-                  <TableCell align="right">In view</TableCell>
-                  <TableCell align="right">Peak confidence</TableCell>
-                  <TableCell>Status</TableCell>
+                  <TableCell>{t("events.kind")}</TableCell>
+                  <TableCell>{t("events.camera")}</TableCell>
+                  <TableCell>{t("events.detected")}</TableCell>
+                  <TableCell align="right">{t("events.inView")}</TableCell>
+                  <TableCell align="right">{t("events.peakConfidence")}</TableCell>
+                  <TableCell>{t("events.status")}</TableCell>
                   <TableCell align="right" />
                 </TableRow>
               </TableHead>
@@ -230,7 +234,7 @@ export default function Events() {
                           color="text.secondary"
                           variant="body2"
                         >
-                          {event.camera_name || "Unnamed"}
+                          {event.camera_name || t("events.unnamed")}
                         </Link>
                       ) : (
                         <Typography variant="body2" color="text.disabled">
@@ -258,7 +262,7 @@ export default function Events() {
                     </TableCell>
                     <TableCell align="right">
                       <Button size="small" component={RouterLink} to={`/events/${event.event_id}`}>
-                        Review
+                        {t("events.review")}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -280,21 +284,21 @@ export default function Events() {
       ) : (
         <Card>
           <EmptyState
-            title={hasFilters ? "Nothing matches these filters" : "No incidents yet"}
+            title={hasFilters ? t("events.nothingMatchesTheseFilters") : t("events.noIncidentsYet")}
             description={
               hasFilters
-                ? "Try widening the status, kind, camera or date filter."
-                : "Incidents appear here as soon as a camera confirms fire or smoke."
+                ? t("events.tryWideningTheStatusKind")
+                : t("events.incidentsAppearHereAsSoon")
             }
             icon={<LocalFireDepartmentIcon fontSize="inherit" />}
             action={
               hasFilters ? (
                 <Button variant="outlined" onClick={() => setParams(new URLSearchParams())}>
-                  Clear filters
+                  {t("events.clearFilters")}
                 </Button>
               ) : (
                 <Button variant="outlined" component={RouterLink} to="/cameras">
-                  Check cameras
+                  {t("events.checkCameras")}
                 </Button>
               )
             }

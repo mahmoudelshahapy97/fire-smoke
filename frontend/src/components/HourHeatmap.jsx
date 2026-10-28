@@ -4,6 +4,7 @@ import Stack from "@mui/material/Stack";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { alpha, useTheme } from "@mui/material/styles";
+import { useTranslation } from "react-i18next";
 
 // Postgres EXTRACT(DOW): 0 is Sunday.
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -21,6 +22,7 @@ const pad = (hour) => String(hour).padStart(2, "0");
  * `cells` is sparse - [{weekday, hour, events}] for the non-empty ones only.
  */
 export function HourHeatmap({ cells = [], unit = "alert" }) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const base = theme.palette.primary.main;
 
@@ -111,7 +113,7 @@ export function HourHeatmap({ cells = [], unit = "alert" }) {
           }}
         />
         <Typography variant="caption" color="text.secondary">
-          {max} per hour
+          {t("hourHeatmap.maxPerHour", { max })}
         </Typography>
       </Stack>
     </Box>
