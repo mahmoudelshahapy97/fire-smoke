@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 import uvicorn
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
@@ -18,7 +19,9 @@ from app.core.database import (
 )
 from app.core.logging_config import setup_logging
 from app.core.migrations import run_migrations
-from app.services import retention
+from app.core.observability import RequestIdMiddleware, install_error_handlers
+from app.services import camera_health, retention
+from app.services.audit_service import AuditMiddleware
 from app.services.stream_manager import stream_manager
 from app.services.user_service import user_service
 
@@ -58,6 +61,7 @@ async def lifespan(app: FastAPI):
             logger.error("Could not start camera workers: %s", e, exc_info=True)
 
         retention.start()
+        camera_health.start()
     else:
         logger.warning("Schema not ready; bootstrap admin and camera workers were not started.")
         # The supervisor starts enabled cameras once the tables appear.
@@ -68,6 +72,7 @@ async def lifespan(app: FastAPI):
 
     logger.info("Shutdown sequence initiated...")
     await retention.stop()
+    await camera_health.stop()
 
     try:
         await stream_manager.shutdown()
@@ -96,6 +101,12 @@ app.add_middleware(
     allow_methods=config.cors_allow_methods,
     allow_headers=config.cors_allow_headers,
 )
+
+
+# Outermost last: the request id exists before anything logs or audits.
+app.add_middleware(AuditMiddleware, api_prefix=config.app_api_prefix)
+app.add_middleware(RequestIdMiddleware)
+install_error_handlers(app)
 
 
 @app.middleware("http")
@@ -137,6 +148,21 @@ async def health_check():
             "supervisor_running": stream_manager.supervisor_running,
         },
     }
+
+
+@app.get("/health/live", tags=["system"])
+async def liveness():
+    """The process answers. For an orchestrator's restart decision only."""
+    return {"status": "alive"}
+
+
+@app.get("/health/ready", tags=["system"])
+async def readiness():
+    """Ready for traffic: the database answers. 503 otherwise, so a load
+    balancer stops sending requests while Postgres is away."""
+    if not await check_postgres_health():
+        return JSONResponse(status_code=503, content={"status": "unavailable", "db_connection_ok": False})
+    return {"status": "ready", "db_connection_ok": True}
 
 
 app.include_router(router)

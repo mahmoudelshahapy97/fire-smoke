@@ -54,7 +54,7 @@ class AlertMailer:
             """
             SELECT u.email FROM workspace_member m
             JOIN app_user u ON u.user_id = m.user_id
-            WHERE m.workspace_id = $1 AND u.is_active AND u.email <> ''
+            WHERE m.workspace_id = $1 AND u.is_active AND u.notify_email AND u.email <> ''
             ORDER BY u.email
             """,
             (workspace_id,),
@@ -62,7 +62,7 @@ class AlertMailer:
         )
         if not rows:
             rows = await self.db_manager.execute_query(
-                "SELECT email FROM app_user WHERE role = 'admin' AND is_active AND email <> '' ORDER BY email",
+                "SELECT email FROM app_user WHERE role = 'admin' AND is_active AND notify_email AND email <> '' ORDER BY email",
                 fetch_all=True,
             )
         return [row["email"] for row in rows]
@@ -73,9 +73,16 @@ class AlertMailer:
             if not to:
                 logger.warning("No one to email about event %s.", event["event_id"])
                 return
-            message = self.message(camera, event, to)
-            await asyncio.to_thread(OtpService._send_blocking, message)
-            logger.info("Alert email for event %s sent to %s recipient(s).", event["event_id"], len(to))
+            # One message per person: a shared To: line would hand every
+            # recipient the whole list of addresses.
+            sent = 0
+            for address in to:
+                try:
+                    await asyncio.to_thread(OtpService._send_blocking, self.message(camera, event, [address]))
+                    sent += 1
+                except Exception as e:
+                    logger.error("Alert email for event %s to one recipient failed: %s", event["event_id"], e)
+            logger.info("Alert email for event %s sent to %s of %s recipient(s).", event["event_id"], sent, len(to))
         except Exception as e:
             logger.error("Could not email the alert for event %s: %s", event["event_id"], e)
 

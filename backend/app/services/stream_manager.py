@@ -27,6 +27,7 @@ import numpy as np
 
 from app.core.config import config
 from app.services.alert_mailer import alert_mailer
+from app.services.inbox_service import inbox_service
 from app.services.camera_service import camera_service
 from app.services.clip_recorder import ClipRecorder, FinishedClip, encode_mp4, resize_max_width
 from app.services.event_service import event_service
@@ -88,6 +89,34 @@ async def wait_for_clips(timeout: float) -> None:
     _, pending = await asyncio.wait(set(_clip_tasks), timeout=timeout)
     if pending:
         logger.warning("%s clip(s) still encoding at shutdown.", len(pending))
+
+
+_inbox_tasks: Set[asyncio.Task] = set()
+
+
+def _spawn(coro, name: str) -> None:
+    """The bell's half of an alert goes out beside the camera loop."""
+    task = asyncio.create_task(coro, name=name)
+    _inbox_tasks.add(task)
+    task.add_done_callback(_inbox_tasks.discard)
+
+
+async def _alert_to_inbox(camera: Dict[str, Any], event: Dict[str, Any]) -> None:
+    """Everyone who can see the camera's workspace hears about a new fire or
+    smoke incident once (ref_id = the incident)."""
+    kind = event["kind"]
+    where = alert_mailer.location_text(camera)
+    await inbox_service.notify_workspace(
+        event.get("workspace_id") or camera.get("workspace_id"),
+        kind="alert",
+        severity="critical" if kind == "fire" else "high",
+        title=f"{kind.capitalize()} detected on {camera['name']}",
+        message=event_service.alert_message(kind, where),
+        link=f"/events/{event['event_id']}",
+        camera_id=camera["camera_id"],
+        camera_name=camera["name"],
+        ref_id=event["event_id"],
+    )
 
 
 class CameraWorker:
@@ -372,6 +401,7 @@ class CameraWorker:
                     if config.clip_enabled and now is not None:
                         self.clips.start(stored["event_id"], now)
                     alert_mailer.notify(self.camera, stored)
+                    _spawn(_alert_to_inbox(self.camera, stored), f"alert-inbox-{stored['event_id']}")
             elif incident.event_id is None:
                 return  # its opening was never stored
             elif event.type == REOPENED:

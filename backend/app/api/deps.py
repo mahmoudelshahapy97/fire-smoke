@@ -54,15 +54,18 @@ async def _load_active_user(payload: Optional[Dict[str, Any]]) -> Dict[str, Any]
 
 
 async def get_current_user(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> Dict[str, Any]:
     """Base guard: any authenticated, active account. Every route below
     `require_role` and every route that just needs "logged in" depends on
-    this."""
+    this. The account is left on the request for the audit middleware."""
     if not credentials:
         raise _UNAUTHORIZED
     payload = decode_token(credentials.credentials, "access")
-    return await _load_active_user(payload)
+    user = await _load_active_user(payload)
+    request.state.audit_user = user
+    return user
 
 
 def require_role(minimum: str):
