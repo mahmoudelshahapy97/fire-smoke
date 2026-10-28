@@ -10,6 +10,7 @@ see, and each row names its own.
 import asyncio
 import logging
 import time
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -41,6 +42,7 @@ async def list_notifications(
     workspace_id: Optional[UUID] = Query(None),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    before: Optional[datetime] = Query(None, description="Only rows created before this; pages back"),
     current_user: Dict[str, Any] = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """The caller's notifications, newest first: {items, total, unread}."""
@@ -51,6 +53,7 @@ async def list_notifications(
         workspace_id=workspace_id,
         limit=limit,
         offset=offset,
+        before=before,
     )
 
 

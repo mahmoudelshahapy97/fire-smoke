@@ -115,6 +115,17 @@ async def test_one_thing_notifies_an_account_once(world):
     assert page["total"] == 1
 
 
+async def test_leaving_a_workspace_takes_its_notifications_out_of_the_bell(world):
+    await inbox_service.notify_workspace(world["ws"]["workspace_id"], kind="alert", title="t", ref_id=uuid.uuid4())
+    member = world["member"]["user_id"]
+    assert (await inbox_service.list_for(member, kind="alert"))["total"] == 1
+    await db_manager.execute_query(
+        "DELETE FROM workspace_member WHERE user_id = $1 AND workspace_id = $2", (member, world["ws"]["workspace_id"])
+    )
+    assert (await inbox_service.list_for(member, kind="alert"))["total"] == 0
+    assert await inbox_service.unread_count(member) == 0
+
+
 async def test_notification_routes_list_read_and_unread(world, client):
     headers = _bearer(world["member"])
     assert (await client.post("/notifications/test", headers=headers)).json() == {"sent": 1}

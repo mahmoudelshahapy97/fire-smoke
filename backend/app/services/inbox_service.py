@@ -38,6 +38,16 @@ _FROM = """
     LEFT JOIN workspace w ON w.workspace_id = n.workspace_id
     LEFT JOIN camera c ON c.camera_id = n.camera_id
 """
+# Only rows from workspaces the account can still see: removing someone from
+# a workspace (or deactivating it) also takes its alerts out of their bell.
+# Notifications with no workspace (tests, system) are always theirs.
+_VISIBLE = """
+    n.user_id = $1 AND (
+        n.workspace_id IS NULL
+        OR EXISTS (SELECT 1 FROM app_user u WHERE u.user_id = n.user_id AND u.role = 'admin')
+        OR EXISTS (SELECT 1 FROM workspace vw JOIN workspace_member m ON m.workspace_id = vw.workspace_id
+                   WHERE vw.workspace_id = n.workspace_id AND vw.is_active AND m.user_id = n.user_id))
+"""
 
 
 def _jsonable(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -176,9 +186,13 @@ class InboxService:
         workspace_id: Optional[UUID] = None,
         limit: int = 20,
         offset: int = 0,
+        before: Optional[datetime] = None,
     ) -> Dict[str, Any]:
-        where = ["n.user_id = $1"]
+        where = [_VISIBLE]
         params: List[Any] = [user_id]
+        if before:
+            params.append(before)
+            where.append(f"n.created_at < ${len(params)}")
         if unread_only:
             where.append("n.read_at IS NULL")
         if kind:
@@ -201,7 +215,7 @@ class InboxService:
 
     async def unread_count(self, user_id: UUID) -> int:
         row = await self.db_manager.execute_query(
-            "SELECT COUNT(*) AS n FROM notification WHERE user_id = $1 AND read_at IS NULL",
+            f"SELECT COUNT(*) AS n FROM notification n WHERE {_VISIBLE} AND n.read_at IS NULL",
             (user_id,),
             fetch_one=True,
         )
